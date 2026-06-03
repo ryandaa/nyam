@@ -33,8 +33,15 @@ enum NyamAPI {
         }
     }
 
+    /// Max edge length of the image we upload. GPT-4o vision processes at
+    /// 768x768 / 2048x2048 internally so anything larger is wasted upload
+    /// time. iPhone Pro photos can be 4032 px wide — without this they'd
+    /// be ~5 MB of base64 and Cloudflare drops the connection mid-stream.
+    static let maxUploadDimension: CGFloat = 1536
+
     static func scan(image: UIImage, plateDiameterCm: Double, identityToken: String?) async throws -> ScanResult {
-        guard let jpeg = image.jpegData(compressionQuality: 0.7) else {
+        let downscaled = downscaled(image, maxDimension: maxUploadDimension)
+        guard let jpeg = downscaled.jpegData(compressionQuality: 0.6) else {
             throw APIError.badImage
         }
         let base64 = jpeg.base64EncodedString()
@@ -52,7 +59,9 @@ enum NyamAPI {
         if let token = identityToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        req.timeoutInterval = 60
+        // GPT-4o vision is typically 10–25s end-to-end; give plenty of
+        // headroom so a slow cellular upload doesn't get killed first.
+        req.timeoutInterval = 120
 
         let body: [String: Any] = [
             "image_base64": base64,
@@ -74,6 +83,19 @@ enum NyamAPI {
             return try JSONDecoder().decode(ScanResult.self, from: data)
         } catch {
             throw APIError.decode(error.localizedDescription)
+        }
+    }
+
+    /// Aspect-preserving downscale so the longest edge is `maxDimension`.
+    /// Returns the original image if it's already small enough.
+    private static func downscaled(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let longest = max(image.size.width, image.size.height)
+        guard longest > maxDimension else { return image }
+        let scale = maxDimension / longest
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
         }
     }
 }
