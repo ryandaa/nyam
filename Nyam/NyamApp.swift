@@ -3,11 +3,16 @@ import SwiftUI
 @main
 struct NyamApp: App {
     @StateObject private var auth = AuthManager()
+    @StateObject private var history = ScanHistory()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(auth)
+                .environmentObject(history)
+                .onChange(of: auth.isSignedIn) { _, signedIn in
+                    if !signedIn { history.clear() }
+                }
         }
     }
 }
@@ -22,6 +27,7 @@ struct CapturedPhoto: Identifiable {
 /// Top-level router. Shows Auth or the Scan flow based on sign-in state.
 struct RootView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var history: ScanHistory
     @State private var captured: CapturedPhoto?
     @State private var result: ScanResult?
 
@@ -42,6 +48,7 @@ struct RootView: View {
                     CalibrationSheet(
                         image: photo.image,
                         onScanComplete: { newResult in
+                            history.record(newResult)
                             captured = nil
                             result = newResult
                         },

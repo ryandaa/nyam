@@ -2,34 +2,52 @@ import SwiftUI
 
 struct ResultsView: View {
     let result: ScanResult
-    let onScanAgain: () -> Void
+    /// When non-nil, the top-right "Scan again" button is shown — used for the
+    /// fresh-scan flow. Pass nil when this view is pushed from history (the
+    /// nav-stack back button handles dismissal).
+    let onScanAgain: (() -> Void)?
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    TotalsCard(totals: result.totals)
-                        .padding(.top, 8)
-
-                    if result.items.isEmpty {
-                        emptyState
-                    } else {
-                        ForEach(result.items) { item in
-                            ItemCard(item: item)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 100)
-            }
+        content
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Your plate")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Scan again", action: onScanAgain)
+                if let onScanAgain {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Scan again", action: onScanAgain)
+                    }
                 }
             }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if onScanAgain != nil {
+            // Fresh-scan flow: wrap in its own NavigationStack so the toolbar shows.
+            NavigationStack { scrollBody }
+        } else {
+            // Pushed from a parent stack (history): inherit that stack.
+            scrollBody
+        }
+    }
+
+    private var scrollBody: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                TotalsCard(totals: result.totals)
+                    .padding(.top, 8)
+
+                if result.items.isEmpty {
+                    emptyState
+                } else {
+                    ForEach(result.items) { item in
+                        ItemCard(item: item)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 100)
         }
     }
 
@@ -154,6 +172,12 @@ private struct MacroChip: View {
     }
 }
 
-#Preview {
+#Preview("Fresh scan") {
     ResultsView(result: .preview, onScanAgain: {})
+}
+
+#Preview("From history") {
+    NavigationStack {
+        ResultsView(result: .preview, onScanAgain: nil)
+    }
 }

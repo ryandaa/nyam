@@ -9,6 +9,7 @@ struct ScanView: View {
     @EnvironmentObject var auth: AuthManager
     @State private var session = CameraSession()
     @State private var showSignOutConfirm = false
+    @State private var showHistory = false
     let onCapture: (UIImage) -> Void
 
     var body: some View {
@@ -31,7 +32,20 @@ struct ScanView: View {
 
             VStack {
                 HStack {
+                    Button {
+                        showHistory = true
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.title2)
+                            .padding(10)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.leading, 20)
+                    .padding(.top, 12)
+
                     Spacer()
+
                     Button {
                         showSignOutConfirm = true
                     } label: {
@@ -79,6 +93,9 @@ struct ScanView: View {
         .confirmationDialog("Sign out?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { auth.signOut() }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showHistory) {
+            HistoryView()
         }
     }
 }

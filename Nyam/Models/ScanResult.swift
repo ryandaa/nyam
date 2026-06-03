@@ -61,3 +61,16 @@ extension ScanResult {
         totals: ScanTotals(calories: 591, proteinG: 35.5, carbsG: 57, fatG: 22.9)
     )
 }
+
+/// A scan plus when it happened. Stored in UserDefaults via `ScanHistory`.
+struct HistoryEntry: Codable, Identifiable, Equatable {
+    let id: UUID
+    let date: Date
+    let result: ScanResult
+
+    init(id: UUID = UUID(), date: Date = Date(), result: ScanResult) {
+        self.id = id
+        self.date = date
+        self.result = result
+    }
+}
