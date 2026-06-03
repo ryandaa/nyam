@@ -79,15 +79,16 @@ private struct TotalsCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(Int(totals.calories.rounded()))")
                     .font(.system(size: 56, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.accentColor)
                 Text("kcal")
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
 
             HStack(spacing: 12) {
-                MacroPill(label: "Protein", grams: totals.proteinG, color: .blue)
-                MacroPill(label: "Carbs", grams: totals.carbsG, color: .orange)
-                MacroPill(label: "Fat", grams: totals.fatG, color: .pink)
+                MacroPill(label: "Protein", value: "\(Int(totals.proteinG.rounded()))", unit: "g", intensity: 1.0)
+                MacroPill(label: "Fiber",   value: "\(Int(totals.fiberG.rounded()))",   unit: "g", intensity: 0.72)
+                MacroPill(label: "Sodium",  value: "\(Int(totals.sodiumMg.rounded()))", unit: "mg", intensity: 0.5)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,22 +99,33 @@ private struct TotalsCard: View {
 
 private struct MacroPill: View {
     let label: String
-    let grams: Double
-    let color: Color
+    let value: String
+    let unit: String
+    /// 1.0 = full accent, 0.5 = half — used to differentiate stats in the same
+    /// hue without resorting to off-palette colors.
+    let intensity: Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("\(Int(grams.rounded()))g")
-                .font(.headline.monospacedDigit())
-                .foregroundStyle(color)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(Color.accentColor.opacity(0.55 + 0.45 * intensity))
+                Text(unit)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+        .background(
+            Color.accentColor.opacity(0.06 + 0.06 * intensity),
+            in: RoundedRectangle(cornerRadius: 10)
+        )
     }
 }
 
@@ -136,16 +148,20 @@ private struct ItemCard: View {
                 VStack(alignment: .trailing, spacing: 0) {
                     Text("\(Int(item.calories.rounded()))")
                         .font(.title3.bold().monospacedDigit())
+                        .foregroundStyle(Color.accentColor)
                     Text("kcal")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            HStack(spacing: 8) {
-                MacroChip(label: "P", grams: item.proteinG, color: .blue)
-                MacroChip(label: "C", grams: item.carbsG, color: .orange)
-                MacroChip(label: "F", grams: item.fatG, color: .pink)
+            // All five micros for the detail row, headlines (P/Fi/Na) emphasized.
+            HStack(spacing: 6) {
+                MacroChip(label: "P",  value: "\(Int(item.proteinG.rounded()))", unit: "g",  emphasized: true)
+                MacroChip(label: "Fi", value: "\(Int(item.fiberG.rounded()))",   unit: "g",  emphasized: true)
+                MacroChip(label: "Na", value: "\(Int(item.sodiumMg.rounded()))", unit: "mg", emphasized: true)
+                MacroChip(label: "C",  value: "\(Int(item.carbsG.rounded()))",   unit: "g",  emphasized: false)
+                MacroChip(label: "F",  value: "\(Int(item.fatG.rounded()))",     unit: "g",  emphasized: false)
             }
         }
         .padding(16)
@@ -155,20 +171,27 @@ private struct ItemCard: View {
 
 private struct MacroChip: View {
     let label: String
-    let grams: Double
-    let color: Color
+    let value: String
+    let unit: String
+    let emphasized: Bool
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             Text(label)
                 .font(.caption2.weight(.heavy))
-                .foregroundStyle(color)
-            Text("\(Int(grams.rounded()))g")
+                .foregroundStyle(emphasized ? Color.accentColor : Color.secondary)
+            Text(value)
                 .font(.caption.monospacedDigit())
+            Text(unit)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 7)
         .padding(.vertical, 4)
-        .background(color.opacity(0.10), in: Capsule())
+        .background(
+            (emphasized ? Color.accentColor.opacity(0.10) : Color(.tertiarySystemBackground)),
+            in: Capsule()
+        )
     }
 }
 

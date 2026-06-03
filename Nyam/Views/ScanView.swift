@@ -5,11 +5,11 @@ import AVFoundation
 ///
 /// On capture, hands off the still image via `onCapture` — the parent decides what
 /// to show next (calibration sheet, then results).
+/// Camera-only view. Hosted inside `CameraFlowView` as a full-screen modal —
+/// sign-out and history are reachable from the Profile tab instead.
 struct ScanView: View {
-    @EnvironmentObject var auth: AuthManager
+    @Environment(\.dismiss) private var dismiss
     @State private var session = CameraSession()
-    @State private var showSignOutConfirm = false
-    @State private var showHistory = false
     let onCapture: (UIImage) -> Void
 
     var body: some View {
@@ -32,11 +32,9 @@ struct ScanView: View {
 
             VStack {
                 HStack {
-                    Button {
-                        showHistory = true
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.title2)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.title3.weight(.semibold))
                             .padding(10)
                             .background(.ultraThinMaterial, in: Circle())
                     }
@@ -45,18 +43,6 @@ struct ScanView: View {
                     .padding(.top, 12)
 
                     Spacer()
-
-                    Button {
-                        showSignOutConfirm = true
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.title2)
-                            .padding(10)
-                            .background(.ultraThinMaterial, in: Circle())
-                    }
-                    .foregroundStyle(.primary)
-                    .padding(.trailing, 20)
-                    .padding(.top, 12)
                 }
 
                 Spacer()
@@ -90,13 +76,6 @@ struct ScanView: View {
         }
         .onAppear { session.start() }
         .onDisappear { session.stop() }
-        .confirmationDialog("Sign out?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
-            Button("Sign out", role: .destructive) { auth.signOut() }
-            Button("Cancel", role: .cancel) {}
-        }
-        .sheet(isPresented: $showHistory) {
-            HistoryView()
-        }
     }
 }
 

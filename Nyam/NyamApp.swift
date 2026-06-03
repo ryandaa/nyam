@@ -18,49 +18,24 @@ struct NyamApp: App {
 }
 
 /// Wrapper so we can drive `.sheet(item:)` with a captured image without
-/// retroactively conforming UIImage to Identifiable.
+/// retroactively conforming UIImage to Identifiable. Used by `CameraFlowView`.
 struct CapturedPhoto: Identifiable {
     let id = UUID()
     let image: UIImage
 }
 
-/// Top-level router. Shows Auth or the Scan flow based on sign-in state.
+/// Top-level router. Auth screen vs. the signed-in tab shell.
 struct RootView: View {
     @EnvironmentObject var auth: AuthManager
-    @EnvironmentObject var history: ScanHistory
-    @State private var captured: CapturedPhoto?
-    @State private var result: ScanResult?
 
     var body: some View {
         Group {
-            if !auth.isSignedIn {
-                AuthView()
-            } else if let result {
-                ResultsView(result: result, onScanAgain: {
-                    self.result = nil
-                    self.captured = nil
-                })
+            if auth.isSignedIn {
+                RootTabView()
             } else {
-                ScanView(onCapture: { image in
-                    captured = CapturedPhoto(image: image)
-                })
-                .sheet(item: $captured) { photo in
-                    CalibrationSheet(
-                        image: photo.image,
-                        onScanComplete: { newResult in
-                            history.record(newResult)
-                            captured = nil
-                            result = newResult
-                        },
-                        onCancel: {
-                            captured = nil
-                        }
-                    )
-                    .interactiveDismissDisabled()
-                }
+                AuthView()
             }
         }
         .animation(.easeInOut(duration: 0.22), value: auth.isSignedIn)
-        .animation(.easeInOut(duration: 0.22), value: result != nil)
     }
 }
