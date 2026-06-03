@@ -11,11 +11,16 @@ export interface ScanRequest {
 export interface ScanItem {
   name: string;
   plate_area_percent: number;
+  width_cm: number;
+  depth_cm: number;
+  height_cm: number;
   estimated_grams: number;
   calories: number;
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  fiber_g: number;
+  sodium_mg: number;
 }
 
 export interface ScanTotals {
@@ -23,6 +28,8 @@ export interface ScanTotals {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  fiber_g: number;
+  sodium_mg: number;
 }
 
 export interface ScanResult {
