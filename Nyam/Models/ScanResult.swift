@@ -63,7 +63,10 @@ extension ScanResult {
 }
 
 /// A scan plus when it happened. Stored in UserDefaults via `ScanHistory`.
-struct HistoryEntry: Codable, Identifiable, Equatable {
+///
+/// Hashable conformance keys off `id` only so we can use HistoryEntry as the
+/// value type for `NavigationLink(value:)` and `navigationDestination(for:)`.
+struct HistoryEntry: Codable, Identifiable, Hashable {
     let id: UUID
     let date: Date
     let result: ScanResult
@@ -72,5 +75,13 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
         self.id = id
         self.date = date
         self.result = result
+    }
+
+    static func == (lhs: HistoryEntry, rhs: HistoryEntry) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }

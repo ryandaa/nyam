@@ -41,12 +41,7 @@ enum PlateDetector {
         }
 
         // Walk top-level contours, pick the one whose bbox is most circle-like and largest.
-        let topLevelContours: [VNContour]
-        do {
-            topLevelContours = try observation.topLevelContours
-        } catch {
-            return rectangleFallback(cgImage: cgImage)
-        }
+        let topLevelContours = observation.topLevelContours
 
         var best: (rect: CGRect, score: Double)?
         for contour in topLevelContours {
