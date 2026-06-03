@@ -41,9 +41,15 @@ enum PlateDetector {
         }
 
         // Walk top-level contours, pick the one whose bbox is most circle-like and largest.
+        let topLevelContours: [VNContour]
+        do {
+            topLevelContours = try observation.topLevelContours
+        } catch {
+            return rectangleFallback(cgImage: cgImage)
+        }
+
         var best: (rect: CGRect, score: Double)?
-        for i in 0..<observation.topLevelContourCount {
-            guard let contour = try? observation.topLevelContour(at: i) else { continue }
+        for contour in topLevelContours {
             // Vision contours use a unit normalized coord space, Y-up.
             let bbox = contour.normalizedPath.boundingBox
             let area = Double(bbox.width * bbox.height)
