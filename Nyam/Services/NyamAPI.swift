@@ -8,14 +8,15 @@ import UIKit
 ///   - your local Worker for development (`http://<mac-lan-ip>:8787`)
 ///
 /// For local dev, append `?dev=1` to skip Apple JWT verification:
-///   `static let baseURL = URL(string: "http://192.168.1.42:8787")!`
+///   `static let baseURL = URL(string: "10.31.98.79")!`
 ///   `static let appendDevFlag = true`
 enum NyamAPI {
     /// EDIT ME before running: point at your deployed Worker or your Mac's LAN IP.
-    static let baseURL = URL(string: "http://localhost:8787")!
+    static let baseURL = URL(string: "https://nyam-backend.ryandaa.workers.dev")!
 
-    /// Set to true in dev mode to bypass Apple JWT verification on the Worker.
-    /// Must match the Worker's `?dev=1` query path.
+    /// When true, append `?dev=1` so the Worker skips auth verification.
+    /// Required in V1 because we ship a stub token (free Apple Developer tier
+    /// can't sign apps with Sign in with Apple).
     static let appendDevFlag = true
 
     enum APIError: LocalizedError {

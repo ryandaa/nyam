@@ -1,6 +1,6 @@
 name: Nyam
 options:
-  bundleIdPrefix: ai.gojuly.nyam
+  bundleIdPrefix: com.ryandaa.nyam
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -37,12 +37,10 @@ targets:
           - armv7
     entitlements:
       path: Nyam/Nyam.entitlements
-      properties:
-        com.apple.developer.applesignin:
-          - Default
+      properties: {}
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: ai.gojuly.nyam
+        PRODUCT_BUNDLE_IDENTIFIER: com.ryandaa.nyam
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"

@@ -31,8 +31,8 @@ iPhone (SwiftUI)
     Results: per-item grams + macros + plate area %
 ```
 
-- **Native iOS app** (SwiftUI, iOS 17+): Sign in with Apple → camera scan → calibration confirm → results.
-- **Cloudflare Worker** (TypeScript): thin proxy that keeps the OpenAI key off the device and verifies SIWA tokens.
+- **Native iOS app** (SwiftUI, iOS 17+): one-tap stub auth → camera scan → calibration confirm → results. *(The Worker is built for Sign in with Apple; V1 ships a stub because free Apple Developer accounts can't sign apps with the SIWA capability. Swapping back to real SIWA is a few-line change in `AuthView` and `AuthManager`.)*
+- **Cloudflare Worker** (TypeScript): thin proxy that keeps the OpenAI key off the device. Validates Apple identity tokens on real requests; honors `?dev=1` to skip validation for the V1 stub flow.
 - **OpenAI GPT-4o** with `response_format: json_schema` — structured nutrition output, no string parsing.
 
 ## Setup
@@ -43,7 +43,7 @@ iPhone (SwiftUI)
 - **Node 20+** and **npm**
 - **Cloudflare account** (free tier is plenty) + `wrangler` CLI (`npm i -g wrangler`)
 - **OpenAI API key** with `gpt-4o` access
-- **Apple Developer account** (free tier works for personal-device testing) — required for Sign in with Apple
+- **Apple Developer account** (free tier works for personal-device testing) — paid tier only required if you swap the V1 stub auth back to real Sign in with Apple
 - An **iPhone** for testing (Pro recommended; LiDAR is a planned future feature)
 
 ### 1. Backend — Cloudflare Worker
@@ -84,7 +84,7 @@ In Xcode:
 
 ## How it works end-to-end
 
-1. **Sign in with Apple** — one-tap auth, returns an identity token persisted in Keychain.
+1. **Auth** — V1 ships a one-tap "Continue" stub that stores a placeholder token in Keychain. The Worker accepts it via `?dev=1`. (Architecture is ready for real Sign in with Apple — see the comment in `AuthManager.swift`.)
 2. **Camera view** — `AVCaptureSession` with a live `VNDetectRectanglesRequest` (Apple Vision framework) finds the plate's ellipse in the frame and draws an overlay.
 3. **Capture** — user taps shutter; we grab the still photo.
 4. **Calibration sheet** — confirm or adjust the detected plate diameter (default 26 cm = 10 in).
@@ -149,7 +149,7 @@ Aligns to the rubric's four prompts: *why*, *how*, *use cases*, *what's next*.
 - Stress the two things that are new vs Cal-AI: on-device plate detection, and the prompt that anchors gram estimates to the plate's known area.
 
 **1:00 – 2:30 · Live demo on iPhone**
-- Open the app, Sign in with Apple (10 sec).
+- Open the app, tap Continue (the stub auth — 2 sec).
 - Camera viewfinder, plate guide overlay.
 - Capture the same meal you weighed.
 - Calibration sheet: plate diameter prefilled, confirm.

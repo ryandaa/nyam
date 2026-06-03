@@ -1,12 +1,16 @@
 import Foundation
-import AuthenticationServices
 import Combine
 
-/// Owns the user's Apple identity token. Persists it to Keychain.
+/// Owns the user's session token.
+///
+/// V1 uses a local stub token because the Apple Developer free tier doesn't
+/// support Sign in with Apple. The Worker's `?dev=1` mode (already enabled in
+/// `NyamAPI.appendDevFlag`) accepts any token, so the stub is sufficient for
+/// the class demo. The architecture is left ready for SIWA — swap the stub
+/// for `SignInWithAppleButton` once a paid developer account is available.
 @MainActor
 final class AuthManager: ObservableObject {
     @Published private(set) var identityToken: String?
-    @Published private(set) var userIdentifier: String?
 
     var isSignedIn: Bool { identityToken != nil }
 
@@ -14,30 +18,16 @@ final class AuthManager: ObservableObject {
         identityToken = Keychain.load()
     }
 
-    /// Call from `SignInWithAppleButton`'s `onCompletion`.
-    func handleAuthorization(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case let .success(authorization):
-            guard
-                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                let tokenData = credential.identityToken,
-                let token = String(data: tokenData, encoding: .utf8)
-            else {
-                return
-            }
-            Keychain.save(token)
-            identityToken = token
-            userIdentifier = credential.user
-        case let .failure(error):
-            #if DEBUG
-            print("Sign in with Apple failed: \(error.localizedDescription)")
-            #endif
-        }
+    /// V1 stub. Stores a placeholder token in Keychain so the rest of the app
+    /// behaves identically to a real signed-in state.
+    func signInAsGuest() {
+        let stub = "stub-token-\(UUID().uuidString)"
+        Keychain.save(stub)
+        identityToken = stub
     }
 
     func signOut() {
         Keychain.clear()
         identityToken = nil
-        userIdentifier = nil
     }
 }

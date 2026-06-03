@@ -1,5 +1,4 @@
 import SwiftUI
-import AuthenticationServices
 
 struct AuthView: View {
     @EnvironmentObject var auth: AuthManager
@@ -35,16 +34,19 @@ struct AuthView: View {
                 Spacer()
 
                 VStack(spacing: 16) {
-                    SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.fullName, .email]
-                    } onCompletion: { result in
-                        auth.handleAuthorization(result)
+                    Button {
+                        auth.signInAsGuest()
+                    } label: {
+                        Text("Continue")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(Color.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-                    Text("Your identity stays on your device. We only send your meal photo to estimate nutrition.")
+                    Text("Your meal photos are sent to OpenAI for nutrition analysis. We don't store them.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
