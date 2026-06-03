@@ -1,16 +1,38 @@
 import { SCAN_SCHEMA } from "./schema";
 import type { ScanResult } from "./types";
 
-const SYSTEM_PROMPT = `You analyze overhead photos of meals on plates.
+const SYSTEM_PROMPT = `You are a nutrition vision model. You analyze overhead photos of meals on plates and return strict JSON nutrition estimates.
 
-A plate is visible in the image, and the user has told you its real-world diameter in centimeters. Use the plate as a scale reference: estimate each food item's footprint as a percentage of the plate's circular area, then convert to grams using typical food density and the plate's known area.
+THE CRITICAL ANCHOR — THE PLATE IS YOUR SCALE
+The user supplies the plate's real-world diameter in centimeters. Compute the plate's total area: A_plate = π × (diameter / 2)². Every portion estimate must be derived from this anchor — do NOT free-form-guess sizes the way an unanchored vision model would. The plate is the only ground-truth measurement you have.
 
-Rules:
-- Only count visible items on the plate. Do not invent items you cannot see.
-- If the plate is empty or no plate is visible, return an empty items array and plate_detected accordingly.
-- Be conservative on grams when the food is layered or partially hidden — explain ambiguity by lowering your estimate.
-- "totals" must equal the sum of per-item macros.
-- Return JSON exactly matching the supplied schema.`;
+REASONING STEPS (think through these silently, then emit JSON)
+1. Confirm a plate is visible. If not, plate_detected=false and items=[].
+2. Identify each distinct food item. Merge items of the same kind (one "rice", not three). Aim for 2–6 items per plate unless clearly more.
+3. For each item, estimate footprint as a percent of the plate's circular area (plate_area_percent, 0–100).
+4. Compute the item's footprint area in cm² from plate_area_percent and the plate area.
+5. Estimate the item's average height in cm (this is the hardest step — be conservative):
+     - flat foods (sauce, leafy greens, deli slices): 0.5–1 cm
+     - typical sides (rice, pasta, beans, vegetables): 1.5–3 cm
+     - dense piles / proteins (chicken thigh, steak, fish fillet): 2–4 cm
+     - heaped mounds, burgers, stacks: 4–6 cm
+6. Estimate volume = area × height in cm³.
+7. Convert to grams using a typical density:
+     - cooked grains (rice, pasta, quinoa): ~0.7 g/cm³
+     - cooked proteins (chicken, fish, beef): ~1.0 g/cm³
+     - cooked vegetables: ~0.6 g/cm³
+     - bread / baked goods: ~0.3 g/cm³
+     - sauces, dressings: ~1.0 g/cm³
+     - leafy greens / salads: ~0.3 g/cm³
+8. From grams, look up macros per 100 g for that specific food (use standard nutrition references — USDA-style values). Compute calories, protein_g, carbs_g, fat_g.
+9. Sanity-check: per-item plate_area_percent values should roughly sum to ≤ 100 (empty plate space is normal). Totals must equal the sum of per-item macros.
+
+RULES
+- Only count what is clearly visible. Do not invent items.
+- When food is layered or partially hidden, lower your estimate rather than guess high.
+- Round grams to the nearest 5 g; round calories to the nearest 5 kcal; round macros to one decimal.
+- Item names: lowercase common English, no brand names unless they are unmistakable (e.g. "grilled chicken thigh", "white jasmine rice", "steamed broccoli", "fried egg").
+- Return JSON exactly matching the supplied schema. No prose, no markdown, no trailing text.`;
 
 interface OpenAIChatResponse {
   choices?: Array<{
@@ -24,7 +46,12 @@ export async function analyzePlate(
   plateDiameterCm: number,
   apiKey: string,
 ): Promise<ScanResult> {
-  const userText = `Plate diameter: ${plateDiameterCm.toFixed(1)} cm. Identify every food item and return the structured result.`;
+  const plateAreaCm2 = Math.PI * Math.pow(plateDiameterCm / 2, 2);
+  const userText =
+    `Plate diameter: ${plateDiameterCm.toFixed(1)} cm ` +
+    `(plate area ≈ ${plateAreaCm2.toFixed(0)} cm²). ` +
+    `Identify every visible food item and return the structured nutrition result. ` +
+    `Anchor every gram estimate to this plate area.`;
 
   const body = {
     model: "gpt-4o-2024-08-06",
