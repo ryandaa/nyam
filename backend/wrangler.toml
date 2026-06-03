@@ -1,0 +1,17 @@
+name = "nyam-backend"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Logs visible in `wrangler tail` and the dashboard
+[observability]
+enabled = true
+
+# Apple Sign-In `aud` value — must match the iOS bundle identifier.
+# Override per environment if you ship multiple bundle IDs.
+[vars]
+APPLE_AUDIENCE = "ai.gojuly.nyam"
+
+# Secret (set via `wrangler secret put OPENAI_API_KEY` in prod,
+# or via `.dev.vars` locally — see README):
+# OPENAI_API_KEY = "sk-..."

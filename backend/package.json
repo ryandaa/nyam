@@ -1,0 +1,18 @@
+{
+  "name": "nyam-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker backend for Nyam — proxies OpenAI vision calls with SIWA auth.",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 0.0.0.0",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "typescript": "^5.6.2",
+    "wrangler": "^3.78.0"
+  }
+}
