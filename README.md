@@ -94,15 +94,84 @@ In Xcode:
 
 ## Evaluation
 
-> *In-progress — populate this table from real measured meals before submission.*
+### Why a real eval matters
 
-We compare Nyam's portion estimates against ground-truth kitchen-scale weights, side-by-side with an unanchored GPT-4o baseline (no plate reference).
+The whole pitch of Nyam vs Cal-AI is *accuracy*. So the eval has to actually measure that — not "the demo looked nice." We compare Nyam's per-item gram estimates against ground-truth kitchen-scale measurements, alongside an unanchored GPT-4o baseline (no plate reference, same prompt structure otherwise). The point isn't to claim production accuracy; it's to show the plate-anchor reduces systematic error.
 
-| Meal | Component | True g | Nyam g | Δ % | Baseline g | Baseline Δ % |
+### Methodology
+
+For each test meal:
+
+1. **Weigh each component on a kitchen scale** (g, to nearest 1 g). Record the ground truth.
+2. **Plate the meal on a known plate.** Measure the actual plate diameter with a tape measure (most US dinner plates are 26 cm / 10.2 in, but verify yours).
+3. **Photograph overhead** at ~50 cm height, plate centered, plate fully in frame, even lighting. Use the same iPhone for every meal in the eval to remove camera variance.
+4. **Run through Nyam** via `python start.py meal_<n>.jpg <diameter_cm>`. Record per-item estimates.
+5. **Run the unanchored baseline.** Same photo, prompt OpenAI directly (no plate diameter, no scale anchor):
+   ```python
+   # baseline: same image, same JSON schema, but the system prompt
+   # never mentions the plate or scale anchor.
+   ```
+6. **Compute Δ%** = `(nyam_g - true_g) / true_g * 100` per item, then again for the baseline. Mean absolute Δ% across all items is the headline number.
+
+### Sample size
+
+Aim for **≥ 5 meals × ~3 components each = 15 measured items**. More is better, but 15 is enough to show whether the plate anchor helps. Mix easy meals (well-separated items, e.g. chicken + rice + broccoli) and hard meals (layered, e.g. stir-fry on rice, salad with dressing).
+
+### Result template
+
+Populate this from your runs:
+
+| Meal | Component | True g | Nyam g | Nyam Δ% | Baseline g | Baseline Δ% |
 |---|---|---|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| 1 — chicken plate | grilled chicken | | | | | |
+| 1 — chicken plate | jasmine rice | | | | | |
+| 1 — chicken plate | broccoli | | | | | |
+| … | … | | | | | |
+| **Mean abs Δ%** | | | | **TBD** | | **TBD** |
 
-*Procedure:* weigh each component on a kitchen scale, photograph overhead at ~50 cm height, run through both Nyam and an unanchored prompt, log results.
+### Honest limitations
+
+- One photographer, one phone, one plate type — results don't generalize.
+- We're measuring grams, not full nutrition accuracy. Macro values depend on the model's food-knowledge lookup (USDA-style values), which we can't directly verify.
+- Layered foods (stir-fry, casseroles) will be wrong for both Nyam and the baseline. The plate anchor only helps when items are visually distinguishable.
+
+## Demo video script (target 3–4 min)
+
+Aligns to the rubric's four prompts: *why*, *how*, *use cases*, *what's next*.
+
+**0:00 – 0:30 · Why this exists**
+- Show a Cal-AI screenshot and a kitchen scale next to a real meal.
+- "Cal-AI says this rice is 80 g. The scale says 220 g. The model has no scale reference, so it guesses."
+- One sentence on the insight: *your plate is a known-size object — make the model use it.*
+
+**0:30 – 1:00 · How it works**
+- Architecture diagram (1 slide): iPhone → Vision-framework plate detection → Cloudflare Worker → GPT-4o structured output → results.
+- Stress the two things that are new vs Cal-AI: on-device plate detection, and the prompt that anchors gram estimates to the plate's known area.
+
+**1:00 – 2:30 · Live demo on iPhone**
+- Open the app, Sign in with Apple (10 sec).
+- Camera viewfinder, plate guide overlay.
+- Capture the same meal you weighed.
+- Calibration sheet: plate diameter prefilled, confirm.
+- Results page: per-item grams + macros + totals.
+- Tap "Scan again" — show how fast it is.
+
+**2:30 – 3:15 · Accuracy eval**
+- One slide with the result table.
+- "Across 15 measured items, Nyam's mean error was X%; the unanchored baseline was Y%."
+- Be honest about where it failed (layered dishes, etc.).
+
+**3:15 – 4:00 · What's next**
+- LiDAR side-view height (iPhone Pro) — the second view the project proposal mentions.
+- Food log + daily targets (the standard tracker UX, kept out of V1).
+- Restaurant-mode (no plate visible) — needs a different anchor.
+- Closing line on impact: cheaper accuracy → trackers that more people can actually rely on.
+
+### Recording tips
+
+- Capture screen with QuickTime → File → New Movie Recording → choose iPhone as source.
+- Two phones works too: one to record, one running the app.
+- Bad audio sinks the rubric's *Communication* points faster than anything else. Use AirPods or a wired headset, not your laptop mic, and record voiceover separately if needed.
 
 ## AI usage disclosure
 
