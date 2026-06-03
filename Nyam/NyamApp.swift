@@ -12,10 +12,17 @@ struct NyamApp: App {
     }
 }
 
+/// Wrapper so we can drive `.sheet(item:)` with a captured image without
+/// retroactively conforming UIImage to Identifiable.
+struct CapturedPhoto: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
 /// Top-level router. Shows Auth or the Scan flow based on sign-in state.
 struct RootView: View {
     @EnvironmentObject var auth: AuthManager
-    @State private var capturedImage: UIImage?
+    @State private var captured: CapturedPhoto?
     @State private var result: ScanResult?
 
     var body: some View {
@@ -25,21 +32,21 @@ struct RootView: View {
             } else if let result {
                 ResultsView(result: result, onScanAgain: {
                     self.result = nil
-                    self.capturedImage = nil
+                    self.captured = nil
                 })
             } else {
                 ScanView(onCapture: { image in
-                    capturedImage = image
+                    captured = CapturedPhoto(image: image)
                 })
-                .sheet(item: $capturedImage) { image in
+                .sheet(item: $captured) { photo in
                     CalibrationSheet(
-                        image: image,
+                        image: photo.image,
                         onScanComplete: { newResult in
-                            capturedImage = nil
+                            captured = nil
                             result = newResult
                         },
                         onCancel: {
-                            capturedImage = nil
+                            captured = nil
                         }
                     )
                     .interactiveDismissDisabled()
@@ -49,9 +56,4 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.22), value: auth.isSignedIn)
         .animation(.easeInOut(duration: 0.22), value: result != nil)
     }
-}
-
-// Make UIImage usable with `.sheet(item:)` by giving it Identifiable conformance.
-extension UIImage: Identifiable {
-    public var id: ObjectIdentifier { ObjectIdentifier(self) }
 }

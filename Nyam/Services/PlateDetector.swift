@@ -23,8 +23,6 @@ enum PlateDetector {
     /// Returns nil if no plausible plate is found.
     static func detect(in image: UIImage) -> DetectedPlate? {
         guard let cgImage = image.cgImage else { return nil }
-        let imageWidth = CGFloat(cgImage.width)
-        let imageHeight = CGFloat(cgImage.height)
 
         let request = VNDetectContoursRequest()
         request.contrastAdjustment = 1.5
@@ -35,11 +33,11 @@ enum PlateDetector {
         do {
             try handler.perform([request])
         } catch {
-            return rectangleFallback(cgImage: cgImage, imageWidth: imageWidth, imageHeight: imageHeight)
+            return rectangleFallback(cgImage: cgImage)
         }
 
         guard let observation = request.results?.first as? VNContoursObservation else {
-            return rectangleFallback(cgImage: cgImage, imageWidth: imageWidth, imageHeight: imageHeight)
+            return rectangleFallback(cgImage: cgImage)
         }
 
         // Walk top-level contours, pick the one whose bbox is most circle-like and largest.
@@ -59,7 +57,7 @@ enum PlateDetector {
         }
 
         guard let chosen = best, chosen.score > 0.05 else {
-            return rectangleFallback(cgImage: cgImage, imageWidth: imageWidth, imageHeight: imageHeight)
+            return rectangleFallback(cgImage: cgImage)
         }
 
         // Convert Y-up Vision space → Y-down SwiftUI/UIImage space.
@@ -73,7 +71,7 @@ enum PlateDetector {
         )
     }
 
-    private static func rectangleFallback(cgImage: CGImage, imageWidth _: CGFloat, imageHeight _: CGFloat) -> DetectedPlate? {
+    private static func rectangleFallback(cgImage: CGImage) -> DetectedPlate? {
         let request = VNDetectRectanglesRequest()
         request.maximumObservations = 1
         request.minimumAspectRatio = 0.7

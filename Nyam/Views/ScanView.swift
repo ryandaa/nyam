@@ -85,14 +85,17 @@ struct ScanView: View {
 
 // MARK: - Camera plumbing
 
-@MainActor
+/// AVCaptureSession wrapper. Not main-actor isolated — methods dispatch to a
+/// dedicated session queue per Apple's guidance. SwiftUI views hold this via
+/// `@State`; `@Observable` is here only to satisfy SwiftUI's preference, no
+/// properties are actually observed.
 @Observable
 final class CameraSession {
     let captureSession = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private let sessionQueue = DispatchQueue(label: "ai.gojuly.nyam.cameraQueue")
-    private var captureContinuation: CheckedContinuation<UIImage?, Never>?
     private var configured = false
+    private var activeDelegate: PhotoCaptureDelegate?
 
     func start() {
         sessionQueue.async { [weak self] in
@@ -125,8 +128,6 @@ final class CameraSession {
             self.photoOutput.capturePhoto(with: settings, delegate: delegate)
         }
     }
-
-    private var activeDelegate: PhotoCaptureDelegate?
 
     private func configureIfNeeded() {
         guard !configured else { return }
