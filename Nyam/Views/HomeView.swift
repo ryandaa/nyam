@@ -7,7 +7,6 @@ struct HomeView: View {
     @EnvironmentObject var history: ScanHistory
 
     @State private var showManualEntry = false
-    @State private var showCoachChat = false
 
     // V1 defaults — could become user-settable in Profile later.
     private let dailyCalorieGoal: Double = 2000
@@ -22,7 +21,6 @@ struct HomeView: View {
                     weekStrip
                     calorieHero
                     macroCardsRow
-                    coachCTA
                     recentlyUploaded
                 }
                 .padding(.top, 4)
@@ -31,10 +29,6 @@ struct HomeView: View {
             .background(Color.NyamSurface.background.ignoresSafeArea())
             .sheet(isPresented: $showManualEntry) {
                 ManualEntryView()
-                    .environmentObject(history)
-            }
-            .sheet(isPresented: $showCoachChat) {
-                CoachChatView()
                     .environmentObject(history)
             }
             .toolbar {
@@ -212,45 +206,6 @@ struct HomeView: View {
             .padding(.horizontal, 16)
         }
         .padding(.top, 14)
-    }
-
-    private var coachCTA: some View {
-        Button { showCoachChat = true } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.NyamSage.shade5)
-                        .frame(width: 38, height: 38)
-                    Image(systemName: "bubble.left.and.bubble.right.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Talk to your coach")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text("AI dietitian — knows what you've been eating")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.NyamSurface.card)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.NyamSage.shade5.opacity(0.18), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.top, 18)
     }
 
     private var recentlyUploaded: some View {

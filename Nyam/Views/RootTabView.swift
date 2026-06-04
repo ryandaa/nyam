@@ -14,7 +14,7 @@ struct RootTabView: View {
     @State private var showCameraFlow = false
 
     enum Tab {
-        case home, profile
+        case home, coach, profile
     }
 
     var body: some View {
@@ -22,6 +22,7 @@ struct RootTabView: View {
             Group {
                 switch selectedTab {
                 case .home:    HomeView()
+                case .coach:   CoachChatView(isModal: false)
                 case .profile: ProfileView()
                 }
             }
@@ -55,6 +56,13 @@ private struct BottomBar: View {
                 label: "Home",
                 isActive: selected == .home
             ) { selected = .home }
+
+            TabBarButton(
+                icon: "bubble.left.and.bubble.right",
+                activeIcon: "bubble.left.and.bubble.right.fill",
+                label: "Coach",
+                isActive: selected == .coach
+            ) { selected = .coach }
 
             CenterButton(onTap: onCenterTap)
 

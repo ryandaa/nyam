@@ -12,6 +12,11 @@ struct CoachChatView: View {
     @EnvironmentObject var auth: AuthManager
     @Environment(\.dismiss) private var dismiss
 
+    /// When true, shows a "Done" toolbar button that dismisses the view
+    /// (used when presented as a sheet). When false (tab destination),
+    /// dismissal is via the tab bar.
+    var isModal: Bool = false
+
     @State private var transcript: [ChatMessage] = [
         ChatMessage(
             role: .assistant,
@@ -32,8 +37,10 @@ struct CoachChatView: View {
             .navigationTitle("Coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                if isModal {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
                 }
             }
         }
