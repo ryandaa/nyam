@@ -8,13 +8,33 @@ CS 153 Final Project — *The One-Person Frontier Lab*
 
 ## The problem
 
-Cal-AI and other photo-based calorie trackers have a known accuracy problem: GPT-4o (and similar vision models) have no scale anchor in a food photo. They guess "looks like ~150g of rice" with no real reference, and they can be wildly wrong — sometimes 2–3× off. Nutrition experts repeatedly flag this.
+The current category leader is [Cal AI](https://www.calai.app/) — a calorie-tracking app built by two teenagers that crossed millions of downloads in 2024–2025 and was [acquired by MyFitnessPal in March 2026](https://techcrunch.com/2026/03/02/myfitnesspal-has-acquired-cal-ai-the-viral-calorie-app-built-by-teens/). Their stack, [per a March 2025 TechCrunch interview](https://techcrunch.com/2025/03/16/photo-calorie-app-cal-ai-downloaded-over-a-million-times-was-built-by-two-teenagers/) with founder Zach Yadegari, is **frontier vision LLMs from OpenAI and Anthropic plus retrieval over "open source food calorie and image databases from sites like GitHub."** No specific model is named, and no nutrition database is cited.
+
+Crucially, **Cal AI has no scale anchor in the photo.** No reference object, no depth sensing, no LiDAR. The founder [told CNBC](https://www.cnbc.com/2025/09/06/cal-ai-how-a-teenage-ceo-built-a-fast-growing-calorie-tracking-app.html) in September 2025:
+
+> "Some of our users expect it to have X-ray vision, where if you take a picture of a bowl of food and you hid things at the bottom of the bowl, it's going to pick it up. It won't."
+
+In other words: a single 2D photo through a vision LLM, with no spatial measurement layer. Their public accuracy figure is a founder-attributed ~90%, which TechCrunch explicitly noted it "couldn't validate." Independent reviewers have reported significant undercounting on mixed and high-fat meals.
 
 ## The insight
 
-**Your plate is a known-size object that appears in almost every food photo.** Standard US dinner plates are 10–11 inches across. If we (a) detect the plate's pixel diameter on-device, (b) tell the vision model the plate's real-world diameter, and (c) ask it to estimate each food's footprint as a percentage of the plate's area, we get a real measurement instead of a guess.
+**Your plate is a known-size object that appears in almost every food photo.** A standard US dinner plate is 10–11 inches across — and the iPhone's own sensors can recover that size in real-world centimeters without any user input. Once we have the plate's real diameter, every food item on it can be measured against the same anchor, and the vision model is reduced from "guess scale + recognize food" to just "recognize food + apply density."
 
 That's Nyam.
+
+## How Nyam differs from Cal AI
+
+Same class of model (frontier vision LLM), three additional grounding layers on top:
+
+| Layer | Cal AI | Nyam |
+|---|---|---|
+| **Vision model** | OpenAI + Anthropic frontier LLMs (per TechCrunch, Mar 2025) | OpenAI GPT-4o |
+| **Scale recovery** | None — no reference, no depth, no LiDAR ([CNBC, Sept 2025](https://www.cnbc.com/2025/09/06/cal-ai-how-a-teenage-ceo-built-a-fast-growing-calorie-tracking-app.html)) | ARKit horizontal-plane detection + camera-intrinsic raycasting — plate diameter derived from camera physics |
+| **Output format** | Not publicly disclosed | Strict JSON schema — model can't return free-text or skip fields |
+| **Forced dimensions** | None | Per-item `width_cm × depth_cm × height_cm` are required schema fields, computed *before* grams |
+| **Nutrition reference** | "Open-source food calorie and image databases from GitHub" (per TechCrunch, Mar 2025) | Per-category density (g/cm³) and per-100g sodium/fiber anchors baked into the system prompt |
+| **Reasoning chain** | Not disclosed | Explicit 9-step CoT in the system prompt: identify → area% → cm² → dimensions → height → volume → grams → macros → sanity check |
+| **Accuracy claim** | "~90%" (founder), [unvalidated by TechCrunch](https://techcrunch.com/2025/03/16/photo-calorie-app-cal-ai-downloaded-over-a-million-times-was-built-by-two-teenagers/) | See [Evaluation](#evaluation) section — reproducible eval set in `eval/images/` |
 
 ## Architecture
 
@@ -31,7 +51,7 @@ iPhone (SwiftUI)
     Results: per-item grams + macros + plate area %
 ```
 
-- **Native iOS app** (SwiftUI, iOS 17+): one-tap stub auth → camera scan → calibration confirm → results. *(The Worker is built for Sign in with Apple; V1 ships a stub because free Apple Developer accounts can't sign apps with the SIWA capability. Swapping back to real SIWA is a few-line change in `AuthView` and `AuthManager`.)*
+- **Native iOS app** (SwiftUI, iOS 17+): one-tap stub auth → live ARKit-anchored camera scan → results, with the V2 manual-calibration flow as a fallback when the AR plane can't be detected. *(The Worker is built for Sign in with Apple; V1 ships a stub because free Apple Developer accounts can't sign apps with the SIWA capability. Swapping back to real SIWA is a few-line change in `AuthView` and `AuthManager`.)*
 - **Cloudflare Worker** (TypeScript): thin proxy that keeps the OpenAI key off the device. Validates Apple identity tokens on real requests; honors `?dev=1` to skip validation for the V1 stub flow.
 - **OpenAI GPT-4o** with `response_format: json_schema` — structured nutrition output, no string parsing.
 
@@ -85,12 +105,15 @@ In Xcode:
 ## How it works end-to-end
 
 1. **Auth** — V1 ships a one-tap "Continue" stub that stores a placeholder token in Keychain. The Worker accepts it via `?dev=1`. (Architecture is ready for real Sign in with Apple — see the comment in `AuthManager.swift`.)
-2. **Camera view** — `AVCaptureSession` with a live `VNDetectRectanglesRequest` (Apple Vision framework) finds the plate's ellipse in the frame and draws an overlay.
-3. **Capture** — user taps shutter; we grab the still photo.
-4. **Calibration sheet** — confirm or adjust the detected plate diameter (default 26 cm = 10 in).
-5. **POST `/scan`** — image is base64-encoded and sent to the Worker with the diameter and the Apple identity token.
-6. **Worker** — verifies the Apple JWT, then calls OpenAI GPT-4o with a vision message and `response_format: { type: "json_schema", json_schema: SCAN_SCHEMA }`. The schema forces a typed `ScanResult` — no string parsing.
-7. **Results view** — per-item cards (name, plate area %, grams, kcal, P/C/F) and a totals card at the bottom.
+2. **AR camera view** — `ARWorldTrackingConfiguration` runs visual-inertial odometry to find the table as a horizontal plane. As soon as the plane is locked, the capture button turns sage.
+3. **Capture + measurement** — on shutter tap, the captured `ARFrame` is processed:
+   - Apple Vision framework (`VNDetectContoursRequest`) finds the plate's ellipse in pixel space.
+   - `ARFrame.raycastQuery` shoots a ray from the plate's screen-space center onto the detected horizontal plane to get the real distance from camera to plate in meters.
+   - Pinhole projection (`real_diameter = pixel_diameter × distance / focal_length_px`) using the focal length from `ARFrame.camera.intrinsics` gives the plate's real-world diameter in cm.
+4. **POST `/scan`** — image + measured plate diameter sent to the Worker. If AR couldn't lock on (no plane, bad lighting), the V2 manual-calibration sheet asks the user to enter the plate size instead.
+5. **Worker** — verifies the Apple JWT (or skips it via `?dev=1`), then calls OpenAI GPT-4o with a vision message and `response_format: { type: "json_schema", json_schema: SCAN_SCHEMA }`. The schema forces per-item `width_cm × depth_cm × height_cm` plus all macros (cal/P/C/F/Fi/Na) plus a short title — no free-text parsing.
+6. **Results view** — model-generated title at the top, per-item cards (name, grams, plate area %, all macros) and a totals card highlighting Calories · Protein · Fiber · Sodium.
+7. **History** — entry persisted to UserDefaults with the captured JPEG saved to `Documents/scans/`. Home feed shows a Strava-style card with the hero image + four stat chips.
 
 ## Evaluation
 
