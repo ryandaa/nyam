@@ -2,6 +2,8 @@ import { verifyAppleIdentityToken } from "./auth";
 import { analyzePlate } from "./openai";
 import { lookupFoods, scaleByGrams } from "./usda";
 import { chatWithCoach } from "./chat";
+import { lookupBarcode } from "./off";
+import { analyzeMenu } from "./menu";
 import type { ChatRequest, Env, NutritionSource, ScanItem, ScanRequest, ScanResult } from "./types";
 
 const CORS_HEADERS = {
@@ -116,6 +118,62 @@ function round(value: number, places: number): number {
   return Math.round(value * m) / m;
 }
 
+async function handleBarcode(url: URL): Promise<Response> {
+  const parts = url.pathname.split("/");
+  const code = parts[parts.length - 1];
+  if (!code) {
+    return json({ error: "Missing barcode in path" }, 400);
+  }
+  try {
+    const result = await lookupBarcode(code);
+    return json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Barcode lookup failed";
+    console.error("barcode error:", message);
+    return json({ error: message }, 502);
+  }
+}
+
+async function handleMenu(request: Request, env: Env, url: URL): Promise<Response> {
+  const token = bearer(request);
+  const skipAuth = url.searchParams.get("dev") === "1" && env.APPLE_AUDIENCE === "ai.gojuly.nyam";
+  if (!token && !skipAuth) {
+    return json({ error: "Missing Authorization: Bearer <appleIdentityToken>" }, 401);
+  }
+  if (token) {
+    try {
+      await verifyAppleIdentityToken(token, env.APPLE_AUDIENCE);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Auth failed";
+      if (!skipAuth) {
+        return json({ error: `Auth failed: ${message}` }, 401);
+      }
+    }
+  }
+
+  let body: { image_base64?: string };
+  try {
+    body = (await request.json()) as { image_base64?: string };
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  if (!body.image_base64 || typeof body.image_base64 !== "string") {
+    return json({ error: "image_base64 (string) required" }, 400);
+  }
+  if (!env.OPENAI_API_KEY) {
+    return json({ error: "Server is missing OPENAI_API_KEY" }, 500);
+  }
+
+  try {
+    const result = await analyzeMenu(body.image_base64, env.OPENAI_API_KEY);
+    return json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Menu analysis failed";
+    console.error("menu error:", message);
+    return json({ error: message }, 502);
+  }
+}
+
 async function handleChat(request: Request, env: Env, url: URL): Promise<Response> {
   // Same auth posture as /scan — Bearer token required unless ?dev=1.
   const token = bearer(request);
@@ -180,6 +238,16 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/chat") {
       return handleChat(request, env, url);
+    }
+
+    if (request.method === "POST" && url.pathname === "/menu") {
+      return handleMenu(request, env, url);
+    }
+
+    // Barcode lookups are GET /barcode/<code>. No auth required — Open Food
+    // Facts is public and this is read-only, no GPT spend.
+    if (request.method === "GET" && url.pathname.startsWith("/barcode/")) {
+      return handleBarcode(url);
     }
 
     if (request.method !== "POST" || url.pathname !== "/scan") {

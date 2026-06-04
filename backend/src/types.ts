@@ -29,7 +29,7 @@ export interface ChatRequest {
   }[];
 }
 
-export type NutritionSource = "usda" | "model";
+export type NutritionSource = "usda" | "model" | "manual" | "open_food_facts";
 
 export interface ScanItem {
   name: string;
