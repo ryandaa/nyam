@@ -1,20 +1,18 @@
 import SwiftUI
-import AVFoundation
+import ARKit
+import RealityKit
 
-/// Full-screen camera viewfinder with a capture button.
-///
-/// On capture, hands off the still image via `onCapture` — the parent decides what
-/// to show next (calibration sheet, then results).
-/// Camera-only view. Hosted inside `CameraFlowView` as a full-screen modal —
-/// sign-out and history are reachable from the Profile tab instead.
+/// ARKit-backed scan view. Hosts a `RealityKit` `ARView` showing the live
+/// camera, watches for horizontal-plane detection, and on capture hands back
+/// the image + (optionally) the measured plate diameter in cm.
 struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var session = CameraSession()
-    let onCapture: (UIImage) -> Void
+    @StateObject private var arScan = ARScanSession()
+    let onCapture: (UIImage, Double?) -> Void
 
     var body: some View {
         ZStack {
-            CameraPreview(session: session.captureSession)
+            ARCameraView(session: arScan.session)
                 .ignoresSafeArea()
 
             // Reticle / framing guide
@@ -47,138 +45,71 @@ struct ScanView: View {
 
                 Spacer()
 
-                VStack(spacing: 6) {
-                    Text("Center your plate in the circle")
-                        .font(.callout)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                }
-                .padding(.bottom, 18)
+                statusBanner
 
                 Button {
-                    session.capture { image in
-                        guard let image else { return }
-                        onCapture(image)
-                    }
+                    let result = arScan.captureScan()
+                    onCapture(result.image, result.diameterCm)
                 } label: {
                     ZStack {
                         Circle()
                             .stroke(.white, lineWidth: 4)
                             .frame(width: 80, height: 80)
                         Circle()
-                            .fill(.white)
+                            .fill(arScan.state == .ready ? Color.accentColor : .white)
                             .frame(width: 66, height: 66)
                     }
                 }
                 .padding(.bottom, 36)
             }
         }
-        .onAppear { session.start() }
-        .onDisappear { session.stop() }
+        .onAppear { arScan.start() }
+        .onDisappear { arScan.stop() }
+    }
+
+    @ViewBuilder
+    private var statusBanner: some View {
+        let (text, icon): (String, String) = {
+            switch arScan.state {
+            case .starting:
+                return ("Starting camera…", "viewfinder")
+            case .lookingForPlane:
+                return ("Move your phone over the table to lock scale", "arrow.up.and.down.and.arrow.left.and.right")
+            case .ready:
+                return ("Center your plate, then capture", "checkmark.circle.fill")
+            case .unsupported:
+                return ("AR not supported on this device — using assumed plate size", "exclamationmark.triangle.fill")
+            }
+        }()
+
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.callout)
+            Text(text)
+                .font(.callout)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.bottom, 18)
     }
 }
 
-// MARK: - Camera plumbing
+// MARK: - ARView wrapper
 
-/// AVCaptureSession wrapper. Not main-actor isolated — methods dispatch to a
-/// dedicated session queue per Apple's guidance. SwiftUI views hold this via
-/// `@State`; `@Observable` is here only to satisfy SwiftUI's preference, no
-/// properties are actually observed.
-@Observable
-final class CameraSession {
-    let captureSession = AVCaptureSession()
-    private let photoOutput = AVCapturePhotoOutput()
-    private let sessionQueue = DispatchQueue(label: "ai.gojuly.nyam.cameraQueue")
-    private var configured = false
-    private var activeDelegate: PhotoCaptureDelegate?
+private struct ARCameraView: UIViewRepresentable {
+    let session: ARSession
 
-    func start() {
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            self.configureIfNeeded()
-            if !self.captureSession.isRunning {
-                self.captureSession.startRunning()
-            }
-        }
+    func makeUIView(context: Context) -> ARView {
+        // automaticallyConfigureSession: false — we already drive the session
+        // from ARScanSession.start() so the SwiftUI wrapper does NOT replace
+        // its configuration.
+        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
+        view.session = session
+        view.renderOptions = [.disablePersonOcclusion, .disableMotionBlur]
+        view.environment.background = .cameraFeed()
+        return view
     }
 
-    func stop() {
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            if self.captureSession.isRunning {
-                self.captureSession.stopRunning()
-            }
-        }
-    }
-
-    func capture(_ completion: @escaping (UIImage?) -> Void) {
-        sessionQueue.async { [weak self] in
-            guard let self else { completion(nil); return }
-            let settings = AVCapturePhotoSettings()
-            settings.flashMode = .off
-            let delegate = PhotoCaptureDelegate { image in
-                DispatchQueue.main.async { completion(image) }
-            }
-            self.activeDelegate = delegate
-            self.photoOutput.capturePhoto(with: settings, delegate: delegate)
-        }
-    }
-
-    private func configureIfNeeded() {
-        guard !configured else { return }
-        configured = true
-
-        captureSession.beginConfiguration()
-        captureSession.sessionPreset = .photo
-
-        guard
-            let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-            let input = try? AVCaptureDeviceInput(device: camera),
-            captureSession.canAddInput(input)
-        else {
-            captureSession.commitConfiguration()
-            return
-        }
-        captureSession.addInput(input)
-
-        if captureSession.canAddOutput(photoOutput) {
-            captureSession.addOutput(photoOutput)
-        }
-        captureSession.commitConfiguration()
-    }
-}
-
-private final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
-    private let completion: (UIImage?) -> Void
-    init(completion: @escaping (UIImage?) -> Void) { self.completion = completion }
-
-    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        if let _ = error {
-            completion(nil)
-            return
-        }
-        guard let data = photo.fileDataRepresentation(), let image = UIImage(data: data) else {
-            completion(nil); return
-        }
-        completion(image)
-    }
-}
-
-struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-
-    func makeUIView(context _: Context) -> PreviewView {
-        let v = PreviewView()
-        v.videoPreviewLayer.session = session
-        v.videoPreviewLayer.videoGravity = .resizeAspectFill
-        return v
-    }
-
-    func updateUIView(_: PreviewView, context _: Context) {}
-
-    final class PreviewView: UIView {
-        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
-        var videoPreviewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-    }
+    func updateUIView(_ uiView: ARView, context: Context) {}
 }
