@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// The Home tab — a Strava-style feed of past meals.
-/// Top to bottom, newest first. Each card shows the meal photo, top food
-/// name, relative date, and four headline stats: Calories, Protein, Fiber,
-/// Sodium. Tap a card → detail view (existing ResultsView).
+/// Beli-style feed of past meals. Wordmark top-left, no card backgrounds,
+/// hairline dividers between entries, score circle on the right.
 struct HomeView: View {
     @EnvironmentObject var history: ScanHistory
 
@@ -14,31 +12,39 @@ struct HomeView: View {
                     EmptyHomeState()
                 } else {
                     ScrollView {
-                        LazyVStack(spacing: 16) {
+                        LazyVStack(spacing: 0) {
                             ForEach(history.entries) { entry in
                                 NavigationLink(value: entry) {
-                                    MealCard(
+                                    MealRow(
                                         entry: entry,
                                         onDelete: { history.delete(entry) }
                                     )
                                 }
                                 .buttonStyle(.plain)
+                                Divider()
+                                    .padding(.leading, 16)
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 96) // leave room for the floating + button
+                        .padding(.top, 4)
+                        .padding(.bottom, 96)
                         .animation(.easeInOut(duration: 0.22), value: history.entries.count)
                     }
                 }
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle("Nyam")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text("nyam")
+                        .font(.system(size: 28, weight: .bold, design: .serif).italic())
+                        .foregroundStyle(Color.NyamSage.shade5)
+                        .padding(.leading, 4)
+                }
+            }
             .navigationDestination(for: HistoryEntry.self) { entry in
                 ResultsView(result: entry.result, onScanAgain: nil)
             }
         }
-        .tint(Color.accentColor)
+        .tint(Color.NyamSage.shade5)
     }
 }
 
@@ -46,15 +52,15 @@ struct HomeView: View {
 
 private struct EmptyHomeState: View {
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
             Spacer()
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.12))
+                    .fill(Color.NyamSage.tint7)
                     .frame(width: 96, height: 96)
                 Image(systemName: "fork.knife")
                     .font(.system(size: 36, weight: .regular))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(Color.NyamSage.shade4)
             }
             VStack(spacing: 6) {
                 Text("No meals yet")
@@ -72,57 +78,110 @@ private struct EmptyHomeState: View {
     }
 }
 
-// MARK: - Meal card
+// MARK: - Meal row (Beli-style feed entry)
 
-private struct MealCard: View {
+private struct MealRow: View {
     let entry: HistoryEntry
     let onDelete: () -> Void
 
     @State private var showDeleteConfirm = false
+    @State private var showShare = false
 
-    /// Title from the model when available; falls back to the top-calorie
-    /// food name for pre-title v2 history entries.
     private var displayTitle: String {
         if let title = entry.result.title, !title.isEmpty { return title }
         return entry.result.items.max(by: { $0.calories < $1.calories })?.name.capitalized ?? "Empty Plate"
     }
 
+    private var itemCountText: String {
+        let n = entry.result.items.count
+        return n == 1 ? "1 item" : "\(n) items"
+    }
+
+    /// Single line summary of detected items, e.g. "chicken, rice, broccoli".
+    private var detectedSummary: String {
+        entry.result.items.prefix(3).map { $0.name.lowercased() }.joined(separator: ", ")
+    }
+
+    private var dayOfWeek: String {
+        entry.date.formatted(.dateTime.weekday(.wide))
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header row — avatar + title block + score circle
+            HStack(alignment: .top, spacing: 12) {
+                AvatarCircle()
+                    .frame(width: 44, height: 44)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 0) {
+                        Text("You scanned ")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            + Text(displayTitle)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                    }
+                    .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "fork.knife")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(itemCountText + " · " + entry.date.formatted(.relative(presentation: .named)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                ScoreCircle(calories: entry.result.totals.calories)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+
+            // Hero photo
             heroImage
-                .overlay(alignment: .topTrailing) {
-                    cardMenu
-                        .padding(10)
-                }
 
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(displayTitle)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(entry.date, format: .relative(presentation: .named))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            // Notes
+            if !detectedSummary.isEmpty {
+                (Text("Notes: ").font(.subheadline.weight(.semibold)) +
+                 Text(detectedSummary).font(.subheadline))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 2)
+            }
 
-                HStack(spacing: 8) {
-                    StatChip(value: "\(Int(entry.result.totals.calories.rounded()))", unit: "kcal", emphasized: true)
-                    StatChip(value: "\(Int(entry.result.totals.proteinG.rounded()))", unit: "P · g")
-                    StatChip(value: "\(Int(entry.result.totals.fiberG.rounded()))", unit: "Fi · g")
-                    StatChip(value: "\(Int(entry.result.totals.sodiumMg.rounded()))", unit: "Na · mg")
+            // Action row
+            HStack(spacing: 22) {
+                Button { showShare = true } label: {
+                    Image(systemName: "paperplane")
+                }
+                Spacer()
+                Menu {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete meal", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
             }
-            .padding(14)
+            .font(.system(size: 18, weight: .regular))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+
+            // Day label
+            Text(dayOfWeek)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 14)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.accentColor.opacity(0.12), lineWidth: 1)
-        )
+        .contentShape(Rectangle())
         .confirmationDialog(
             "Delete this meal?",
             isPresented: $showDeleteConfirm,
@@ -135,27 +194,6 @@ private struct MealCard: View {
         }
     }
 
-    /// Floating ... button in the top-right corner of the hero. Visible on
-    /// any photo via a dark translucent pill. Menu intercepts its own taps
-    /// so the wrapping NavigationLink doesn't fire on hit.
-    private var cardMenu: some View {
-        Menu {
-            Button(role: .destructive) {
-                showDeleteConfirm = true
-            } label: {
-                Label("Delete meal", systemImage: "trash")
-            }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 14, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(.black.opacity(0.45), in: Circle())
-        }
-        // Make the tap target stay within the icon, not bleed into the card.
-        .contentShape(Circle())
-    }
-
     @ViewBuilder
     private var heroImage: some View {
         let image = ScanImageStore.load(relativePath: entry.imagePath)
@@ -166,52 +204,69 @@ private struct MealCard: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 LinearGradient(
-                    colors: [Color.accentColor.opacity(0.25), Color.accentColor.opacity(0.08)],
+                    colors: [Color.NyamSage.tint5, Color.NyamSage.tint7],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 Image(systemName: "photo")
                     .font(.system(size: 32))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.white.opacity(0.85))
             }
         }
-        .frame(height: 200)
+        .frame(height: 220)
+        .frame(maxWidth: .infinity)
         .clipped()
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 18,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 18,
-                style: .continuous
-            )
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
     }
 }
 
-// MARK: - Stat chip
+// MARK: - Score circle (Beli's signature — calories as the "score")
 
-private struct StatChip: View {
-    let value: String
-    let unit: String
-    var emphasized: Bool = false
+private struct ScoreCircle: View {
+    let calories: Double
+
+    private var color: Color {
+        switch calories {
+        case ..<400:        return Color.NyamSage.shade3   // light meal
+        case 400..<800:     return Color.NyamSage.shade4   // typical
+        case 800..<1200:    return Color.NyamSage.shade5   // heavier
+        default:            return Color.NyamSage.shade6   // heavy
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(emphasized ? .system(.headline, design: .rounded).monospacedDigit() : .system(.subheadline, design: .rounded).monospacedDigit().weight(.semibold))
-                .foregroundStyle(emphasized ? Color.accentColor : Color.primary)
-            Text(unit)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.55), lineWidth: 1.5)
+                .frame(width: 56, height: 56)
+            VStack(spacing: 0) {
+                Text("\(Int(calories.rounded()))")
+                    .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(color)
+                Text("kcal")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(color.opacity(0.7))
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(emphasized ? Color.accentColor.opacity(0.12) : Color(.systemBackground))
-        )
+    }
+}
+
+// MARK: - Avatar (sage circle with initial — same as ProfileView)
+
+struct AvatarCircle: View {
+    /// Defaults to "R" — the user identity is mock for V1.
+    var initial: String = "R"
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.NyamSage.shade4)
+            Text(initial)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+        }
     }
 }
 
@@ -228,11 +283,9 @@ private struct StatChip: View {
         .environmentObject(ScanHistory())
 }
 
-#Preview("MealCard alone") {
-    MealCard(
+#Preview("MealRow alone") {
+    MealRow(
         entry: HistoryEntry(result: .preview),
         onDelete: { print("delete") }
     )
-    .padding()
-    .background(Color(.systemBackground))
 }

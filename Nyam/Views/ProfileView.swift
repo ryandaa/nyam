@@ -1,139 +1,363 @@
 import SwiftUI
 
-/// Profile tab: avatar + mock email + lifetime stats + sign out.
-/// Replaces V1's top-right sign-out icon on ScanView.
+/// Beli-style profile: name top-left, large centered avatar, 3-stat row,
+/// action pills, list with circular icons, two stat tiles, calorie-goal card.
 struct ProfileView: View {
     @EnvironmentObject var auth: AuthManager
     @EnvironmentObject var history: ScanHistory
 
-    // TODO: replace with the real email once Sign in with Apple is restored
-    // (requires a paid Apple Developer account — V1 limitation).
-    private let mockEmail = "ryan@nyam.app"
+    // TODO: replace with the real email once Sign in with Apple is restored.
+    private let mockName = "Ryan Da"
+    private let mockHandle = "@ryanda"
+    private let memberSince = "Member since June 2026"
 
     @State private var showSignOutConfirm = false
+
+    private var totalScans: Int { history.entries.count }
+
+    private var scansThisWeek: Int {
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date.distantPast
+        return history.entries.filter { $0.date >= weekAgo }.count
+    }
+
+    private var avgCalories: Int? {
+        guard totalScans > 0 else { return nil }
+        let sum = history.entries.reduce(0.0) { $0 + $1.result.totals.calories }
+        return Int((sum / Double(totalScans)).rounded())
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 0) {
                     header
-                    lifetimeStats
+                    statsRow
+                    actionPills
+                    listSection
+                    tileRow
+                    goalCard
                     Spacer(minLength: 12)
                     signOutButton
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 96) // floating + button clearance
+                .padding(.bottom, 96)
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Text(mockName)
+                        .font(.title2.weight(.bold))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 14) {
+                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "line.3.horizontal")
+                    }
+                    .font(.title3)
+                    .foregroundStyle(.primary)
+                }
+            }
             .confirmationDialog("Sign out?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
                 Button("Sign out", role: .destructive) { auth.signOut() }
                 Button("Cancel", role: .cancel) {}
             }
         }
-        .tint(Color.accentColor)
+        .tint(Color.NyamSage.shade5)
     }
 
-    // MARK: - Sections
+    // MARK: - Header (avatar + handle)
 
     private var header: some View {
-        VStack(spacing: 12) {
-            avatar
-            VStack(spacing: 4) {
-                Text(mockEmail)
-                    .font(.headline)
-                Text("Plate-anchored nutrition")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(Color.NyamSage.shade4)
+                    .frame(width: 110, height: 110)
+                Text(String(mockName.prefix(1)))
+                    .font(.system(size: 44, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
             }
-        }
-        .padding(.top, 12)
-    }
+            .padding(.top, 8)
+            .padding(.bottom, 10)
 
-    private var avatar: some View {
-        ZStack {
-            Circle()
-                .fill(Color.accentColor)
-                .frame(width: 92, height: 92)
-            Text(initials)
-                .font(.system(size: 38, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-        }
-        .shadow(color: Color.accentColor.opacity(0.25), radius: 12, x: 0, y: 6)
-    }
+            Text(mockHandle)
+                .font(.title3.weight(.semibold))
 
-    private var initials: String {
-        let first = mockEmail.first.map { String($0).uppercased() } ?? "?"
-        return first
-    }
-
-    private var lifetimeStats: some View {
-        let totalScans = history.entries.count
-        let avgCalories: Double? = {
-            guard totalScans > 0 else { return nil }
-            let sum = history.entries.reduce(0.0) { $0 + $1.result.totals.calories }
-            return sum / Double(totalScans)
-        }()
-
-        return VStack(alignment: .leading, spacing: 10) {
-            Text("Lifetime")
+            Text(memberSince)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .padding(.leading, 4)
 
-            HStack(spacing: 12) {
-                StatTile(
-                    title: "Total scans",
-                    value: "\(totalScans)"
-                )
-                StatTile(
-                    title: "Avg kcal / meal",
-                    value: avgCalories.map { "\(Int($0.rounded()))" } ?? "—"
-                )
+            Button {} label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus")
+                    Text("Add School")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(Color.NyamSage.shade5)
             }
+            .padding(.top, 4)
         }
     }
+
+    // MARK: - Stats row (Total / Week / Avg)
+
+    private var statsRow: some View {
+        HStack(spacing: 0) {
+            StatColumn(value: "\(totalScans)", label: "Total scans")
+            StatColumn(value: "\(scansThisWeek)", label: "This week")
+            StatColumn(
+                value: avgCalories.map { "\($0)" } ?? "—",
+                label: "Avg kcal"
+            )
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 22)
+    }
+
+    // MARK: - Pill buttons row
+
+    private var actionPills: some View {
+        HStack(spacing: 10) {
+            PillButton("Edit profile") {}
+            PillButton("Share profile") {}
+            PillButton(systemImage: "chevron.down") {}
+                .fixedSize()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+    }
+
+    // MARK: - List with circular icons
+
+    private var listSection: some View {
+        VStack(spacing: 0) {
+            ListRow(icon: "checkmark", label: "Logged Meals", value: "\(totalScans)")
+            Divider().padding(.leading, 56)
+            ListRow(icon: "bookmark", label: "Goals", value: "—", locked: true)
+            Divider().padding(.leading, 56)
+            ListRow(icon: "heart", label: "Recs for You", value: "", locked: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 24)
+    }
+
+    // MARK: - Tile row (Rank + Streak)
+
+    private var tileRow: some View {
+        HStack(spacing: 10) {
+            StatTile(
+                icon: "trophy.fill",
+                title: "Avg kcal / meal",
+                value: avgCalories.map { "\($0)" } ?? "—",
+                locked: false
+            )
+            StatTile(
+                icon: "flame.fill",
+                title: "Current Streak",
+                value: "0 days",
+                locked: false
+            )
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+    }
+
+    // MARK: - Goal card
+
+    private var goalCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Set your daily calorie goal")
+                    .font(.headline)
+                Text("Pick a daily target — Nyam will compare each scan against it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    GoalPill("1800")
+                    GoalPill("2200")
+                    GoalPill("2600")
+                    GoalPill("Custom")
+                }
+                .padding(.top, 6)
+            }
+            Spacer(minLength: 0)
+            Text("🏆")
+                .font(.system(size: 44))
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+    }
+
+    // MARK: - Sign out
 
     private var signOutButton: some View {
         Button(role: .destructive) {
             showSignOutConfirm = true
         } label: {
             Text("Sign out")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(.secondarySystemBackground))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
                 )
                 .foregroundStyle(.red)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+    }
+}
+
+// MARK: - Components
+
+private struct StatColumn: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.title3.weight(.bold).monospacedDigit())
+            Text(label)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct PillButton: View {
+    let title: String?
+    let systemImage: String?
+    let action: () -> Void
+
+    init(_ title: String, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = nil
+        self.action = action
+    }
+
+    init(systemImage: String, action: @escaping () -> Void) {
+        self.title = nil
+        self.systemImage = systemImage
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                if let title { Text(title) }
+                if let systemImage { Image(systemName: systemImage) }
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.primary)
+            .frame(maxWidth: title == nil ? nil : .infinity)
+            .padding(.horizontal, title == nil ? 16 : 8)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color(.separator), lineWidth: 1)
+            )
         }
     }
 }
 
-// MARK: - Tiles
-
-private struct StatTile: View {
-    let title: String
+private struct ListRow: View {
+    let icon: String
+    let label: String
     let value: String
+    var locked: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(value)
-                .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(Color.accentColor)
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .stroke(Color.NyamSage.shade5, lineWidth: 1.5)
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.NyamSage.shade5)
+            }
+            Text(label)
+                .font(.body.weight(.semibold))
+            Spacer()
+            if locked {
+                Image(systemName: "lock.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else if !value.isEmpty {
+                Text(value)
+                    .font(.body.monospacedDigit())
+                    .foregroundStyle(.primary)
+            }
+            Image(systemName: "chevron.right")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 14)
+    }
+}
+
+private struct StatTile: View {
+    let icon: String
+    let title: String
+    let value: String
+    let locked: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color.NyamSage.shade5)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        if locked {
+                            Image(systemName: "lock.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(value)
+                        .font(.title3.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Color.NyamSage.shade5)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
         )
+    }
+}
+
+private struct GoalPill: View {
+    let label: String
+
+    init(_ label: String) {
+        self.label = label
+    }
+
+    var body: some View {
+        Text(label)
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .stroke(Color(.separator), lineWidth: 1)
+            )
     }
 }
 

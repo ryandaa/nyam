@@ -80,20 +80,19 @@ private struct BottomBar: View {
                     .ignoresSafeArea(edges: .bottom)
             )
 
-            // Floating sage "+" button, centered, lifted above the bar
+            // Center "+" button — slightly elevated like Beli's, no heavy shadow
             Button(action: onCenterTap) {
                 ZStack {
                     Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: 64, height: 64)
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 10, x: 0, y: 6)
+                        .fill(Color.NyamSage.shade5)
+                        .frame(width: 56, height: 56)
                     Image(systemName: "plus")
-                        .font(.system(size: 28, weight: .semibold))
+                        .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(.white)
                 }
             }
             .accessibilityLabel("Scan a meal")
-            .offset(y: -22)
+            .offset(y: -14)
         }
     }
 }
@@ -106,14 +105,14 @@ private struct TabBarButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .regular))
+                    .font(.system(size: 20, weight: .regular))
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
             }
             .frame(maxWidth: .infinity)
-            .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+            .foregroundStyle(isActive ? Color.primary : Color.secondary)
         }
         .buttonStyle(.plain)
     }
