@@ -50,6 +50,24 @@ async function enrichWithUSDA(result: ScanResult, apiKey: string | undefined): P
       return { ...item, nutrition_source: "model" as NutritionSource };
     }
     const scaled = scaleByGrams(usda, item.estimated_grams);
+
+    // Atwater fallback. USDA's FoodData Central sometimes has nutrient gaps
+    // — a record might list protein/fat/sodium but omit the energy_kcal
+    // (nutrient 1008) value. Without this fallback, those records would
+    // come back as "0 kcal" which is obviously wrong. Atwater general
+    // factors (4/4/9 kcal per g protein/carbs/fat) is the standard
+    // food-science fill-in and what USDA itself uses internally.
+    if (scaled.calories === 0) {
+      const atwater = scaled.protein_g * 4 + scaled.carbs_g * 4 + scaled.fat_g * 9;
+      if (atwater >= 5) {
+        scaled.calories = Math.round(atwater);
+      } else {
+        // USDA record is nearly all zeros — match quality is bad,
+        // fall back to the model's macros for this item.
+        return { ...item, nutrition_source: "model" as NutritionSource };
+      }
+    }
+
     return {
       ...item,
       calories: scaled.calories,
