@@ -25,6 +25,11 @@ struct CapturedPhoto: Identifiable {
 }
 
 /// Top-level router. Auth screen vs. the signed-in tab shell.
+///
+/// Forces `.preferredColorScheme(.light)` so the cream surface palette is
+/// guaranteed regardless of the user's system theme. Beli, Notion, and most
+/// food apps make this same call — the brand identity reads as warm/light,
+/// and dark mode would invert the carefully-tuned sage contrast.
 struct RootView: View {
     @EnvironmentObject var auth: AuthManager
 
@@ -36,6 +41,7 @@ struct RootView: View {
                 AuthView()
             }
         }
+        .preferredColorScheme(.light)
         .animation(.easeInOut(duration: 0.22), value: auth.isSignedIn)
     }
 }

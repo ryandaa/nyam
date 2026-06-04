@@ -32,7 +32,7 @@ struct RootTabView: View {
                 onCenterTap: { showCameraFlow = true }
             )
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .background(Color.NyamSurface.background.ignoresSafeArea())
         .fullScreenCover(isPresented: $showCameraFlow) {
             CameraFlowView(onFinish: { showCameraFlow = false })
                 .environmentObject(auth)
@@ -69,7 +69,7 @@ private struct BottomBar: View {
         .padding(.horizontal, 8)
         .padding(.bottom, 4)
         .background(
-            Color(.systemBackground)
+            Color.NyamSurface.background
                 .overlay(
                     Rectangle()
                         .frame(height: 0.5)

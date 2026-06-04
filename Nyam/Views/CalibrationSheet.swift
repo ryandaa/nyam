@@ -46,7 +46,7 @@ struct CalibrationSheet: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+                            .background(Color.NyamSurface.card, in: RoundedRectangle(cornerRadius: 12))
                         }
                         .padding(.horizontal, 16)
                     }

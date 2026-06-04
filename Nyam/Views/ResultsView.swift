@@ -14,7 +14,7 @@ struct ResultsView: View {
 
     var body: some View {
         content
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .background(Color.NyamSurface.background.ignoresSafeArea())
             .navigationTitle(navTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -98,7 +98,7 @@ private struct TotalsCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.NyamSurface.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
@@ -171,7 +171,7 @@ private struct ItemCard: View {
             }
         }
         .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.NyamSurface.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -196,6 +196,17 @@ private struct NutritionSourceBadge: View {
             .padding(.vertical, 3)
             .background(Color.accentColor.opacity(0.12), in: Capsule())
             .help(item.usdaDescription ?? "Nutrition from USDA FoodData Central")
+        case .manual:
+            HStack(spacing: 4) {
+                Image(systemName: "pencil")
+                    .font(.caption2)
+                Text("Manual entry")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(Color(.label).opacity(0.7))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Color(.label).opacity(0.08), in: Capsule())
         case .model, .none:
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")

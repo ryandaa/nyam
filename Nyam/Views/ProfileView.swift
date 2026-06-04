@@ -12,6 +12,7 @@ struct ProfileView: View {
     private let memberSince = "Member since June 2026"
 
     @State private var showSignOutConfirm = false
+    @State private var showCoachChat = false
 
     private var totalScans: Int { history.entries.count }
 
@@ -41,7 +42,7 @@ struct ProfileView: View {
                 }
                 .padding(.bottom, 96)
             }
-            .background(Color(.systemBackground).ignoresSafeArea())
+            .background(Color.NyamSurface.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Text(mockName)
@@ -59,6 +60,11 @@ struct ProfileView: View {
             .confirmationDialog("Sign out?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
                 Button("Sign out", role: .destructive) { auth.signOut() }
                 Button("Cancel", role: .cancel) {}
+            }
+            .sheet(isPresented: $showCoachChat) {
+                CoachChatView()
+                    .environmentObject(history)
+                    .environmentObject(auth)
             }
         }
         .tint(Color.NyamSage.shade5)
@@ -134,7 +140,10 @@ struct ProfileView: View {
             Divider().padding(.leading, 56)
             ListRow(icon: "bookmark", label: "Goals", value: "—", locked: true)
             Divider().padding(.leading, 56)
-            ListRow(icon: "heart", label: "Recs for You", value: "", locked: true)
+            Button { showCoachChat = true } label: {
+                ListRow(icon: "bubble.left.and.bubble.right", label: "Chat with coach", value: "")
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.top, 24)

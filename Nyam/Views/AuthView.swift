@@ -6,7 +6,7 @@ struct AuthView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(.systemBackground), Color.accentColor.opacity(0.08)],
+                colors: [Color.NyamSurface.background, Color.accentColor.opacity(0.08)],
                 startPoint: .top,
                 endPoint: .bottom
             )

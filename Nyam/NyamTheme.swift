@@ -39,6 +39,22 @@ extension Color {
     }
 }
 
+/// Surface tokens for the warm-cream Beli/Notion aesthetic. The app forces
+/// `.preferredColorScheme(.light)` so these constants are the actual rendered
+/// colors regardless of the user's system setting.
+extension Color {
+    enum NyamSurface {
+        /// Main screen background — warm cream. Makes the sage primary pop
+        /// without the harshness of pure white.
+        static let background = Color(hex: 0xFAF6EE)
+        /// Cards / elevated surfaces sit just above background — pure white
+        /// gives subtle elevation against the cream.
+        static let card = Color(hex: 0xFFFFFF)
+        /// Faint sage wash for input fields, chips, and secondary surfaces.
+        static let washSage = Color(hex: 0xF3F1E7)
+    }
+}
+
 extension Color {
     /// Construct a sRGB Color from a 24-bit hex literal (e.g. `0x99A66F`).
     init(hex: UInt32) {
