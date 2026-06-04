@@ -19,6 +19,11 @@ struct ScanResult: Codable, Equatable {
     }
 }
 
+enum NutritionSource: String, Codable, Equatable {
+    case usda
+    case model
+}
+
 struct ScanItem: Codable, Equatable, Identifiable {
     var id: String { name }
     let name: String
@@ -33,6 +38,12 @@ struct ScanItem: Codable, Equatable, Identifiable {
     let fatG: Double
     let fiberG: Double
     let sodiumMg: Double
+    /// Provenance: did this item's macros come from USDA FoodData Central
+    /// (scaled by the model's grams estimate) or from the model's own
+    /// nutrition knowledge? Set server-side, optional for back-compat.
+    let nutritionSource: NutritionSource?
+    let usdaFdcId: Int?
+    let usdaDescription: String?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -47,6 +58,9 @@ struct ScanItem: Codable, Equatable, Identifiable {
         case fatG = "fat_g"
         case fiberG = "fiber_g"
         case sodiumMg = "sodium_mg"
+        case nutritionSource = "nutrition_source"
+        case usdaFdcId = "usda_fdc_id"
+        case usdaDescription = "usda_description"
     }
 }
 
@@ -79,21 +93,26 @@ extension ScanResult {
                 plateAreaPercent: 38, widthCm: 11, depthCm: 8, heightCm: 3,
                 estimatedGrams: 145,
                 calories: 326, proteinG: 28, carbsG: 0, fatG: 22,
-                fiberG: 0, sodiumMg: 380
+                fiberG: 0, sodiumMg: 380,
+                nutritionSource: .usda, usdaFdcId: 173627,
+                usdaDescription: "Chicken, broilers or fryers, thigh, meat only, cooked, roasted"
             ),
             ScanItem(
                 name: "Jasmine rice",
                 plateAreaPercent: 34, widthCm: 10, depthCm: 9, heightCm: 2.5,
                 estimatedGrams: 180,
                 calories: 234, proteinG: 5, carbsG: 51, fatG: 0.5,
-                fiberG: 0.7, sodiumMg: 5
+                fiberG: 0.7, sodiumMg: 5,
+                nutritionSource: .usda, usdaFdcId: 168878,
+                usdaDescription: "Rice, white, long-grain, regular, cooked, unenriched"
             ),
             ScanItem(
                 name: "Steamed broccoli",
                 plateAreaPercent: 22, widthCm: 9, depthCm: 7, heightCm: 2.5,
                 estimatedGrams: 90,
                 calories: 31, proteinG: 2.5, carbsG: 6, fatG: 0.4,
-                fiberG: 2.4, sodiumMg: 30
+                fiberG: 2.4, sodiumMg: 30,
+                nutritionSource: .model, usdaFdcId: nil, usdaDescription: nil
             ),
         ],
         totals: ScanTotals(

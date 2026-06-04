@@ -39,7 +39,12 @@ enum NyamAPI {
     /// be ~5 MB of base64 and Cloudflare drops the connection mid-stream.
     static let maxUploadDimension: CGFloat = 1536
 
-    static func scan(image: UIImage, plateDiameterCm: Double, identityToken: String?) async throws -> ScanResult {
+    static func scan(
+        image: UIImage,
+        plateDiameterCm: Double,
+        foodVolumeCm3: Double? = nil,
+        identityToken: String?
+    ) async throws -> ScanResult {
         let downscaled = downscaled(image, maxDimension: maxUploadDimension)
         guard let jpeg = downscaled.jpegData(compressionQuality: 0.6) else {
             throw APIError.badImage
@@ -63,10 +68,13 @@ enum NyamAPI {
         // headroom so a slow cellular upload doesn't get killed first.
         req.timeoutInterval = 120
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "image_base64": base64,
             "plate_diameter_cm": plateDiameterCm,
         ]
+        if let foodVolumeCm3 {
+            body["food_volume_cm3"] = foodVolumeCm3
+        }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: req)
