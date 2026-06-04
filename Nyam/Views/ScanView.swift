@@ -228,9 +228,10 @@ struct ScanView: View {
             return
         }
         libraryPickerItem = nil
-        // Library photos have no ARKit data — diameter is nil so CameraFlow
-        // falls back to the CalibrationSheet for manual plate sizing.
-        onCapture(ARMeasurement(image: image, diameterCm: nil, foodVolumeCm3: nil, tier: .manual))
+        // Library photos have no ARKit data — wrap as .food with nil diameter
+        // so CameraFlowView falls through to the CalibrationSheet for manual
+        // plate sizing.
+        onCapture(.food(ARMeasurement(image: image, diameterCm: nil, foodVolumeCm3: nil, tier: .manual)))
     }
 
     /// Pill in the top-right showing the active measurement tier. Honest
