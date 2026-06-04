@@ -48,6 +48,7 @@ struct ScanView: View {
     @StateObject private var arScan = ARScanSession()
     @State private var libraryPickerItem: PhotosPickerItem?
     @State private var mode: CaptureMode = .food
+    @State private var photoToCrop: CapturedPhoto?
     let onCapture: (CaptureResult) -> Void
 
     var body: some View {
@@ -154,6 +155,18 @@ struct ScanView: View {
             guard let newItem else { return }
             Task { await loadLibraryPhoto(newItem) }
         }
+        .fullScreenCover(item: $photoToCrop) { photo in
+            CropEditorView(
+                image: photo.image,
+                onConfirm: { cropped in
+                    photoToCrop = nil
+                    dispatchLibraryCapture(cropped)
+                },
+                onCancel: {
+                    photoToCrop = nil
+                }
+            )
+        }
     }
 
     @ViewBuilder
@@ -228,10 +241,24 @@ struct ScanView: View {
             return
         }
         libraryPickerItem = nil
-        // Library photos have no ARKit data — wrap as .food with nil diameter
-        // so CameraFlowView falls through to the CalibrationSheet for manual
-        // plate sizing.
-        onCapture(.food(ARMeasurement(image: image, diameterCm: nil, foodVolumeCm3: nil, tier: .manual)))
+        // Library photos go through a crop editor so the user can focus on
+        // a specific region (a single plate in a wider shot, one dish on a
+        // menu, etc.). Default crop is the full image — tapping "Use"
+        // without dragging passes the original through unchanged.
+        photoToCrop = CapturedPhoto(image: image)
+    }
+
+    private func dispatchLibraryCapture(_ image: UIImage) {
+        switch mode {
+        case .food, .qr:
+            // Library uploads go through the food pipeline. QR mode doesn't
+            // really apply (you'd just photograph a barcode and there's no
+            // way to scan that statically), so wrap as food too — model
+            // will treat it as food anyway.
+            onCapture(.food(ARMeasurement(image: image, diameterCm: nil, foodVolumeCm3: nil, tier: .manual)))
+        case .menu:
+            onCapture(.menu(image))
+        }
     }
 
     /// Pill in the top-right showing the active measurement tier. Honest
