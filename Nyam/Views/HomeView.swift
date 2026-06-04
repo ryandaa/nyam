@@ -397,7 +397,7 @@ private struct ScoreCircle: View {
                 Text("\(Int(calories.rounded()))")
                     .font(.system(size: 17, weight: .semibold, design: .rounded).monospacedDigit())
                     .foregroundStyle(color)
-                Text("kcal")
+                Text("cal")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(color.opacity(0.7))
             }

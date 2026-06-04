@@ -20,7 +20,7 @@ struct CoachChatView: View {
     @State private var transcript: [ChatMessage] = [
         ChatMessage(
             role: .assistant,
-            text: "Hi! I'm your Nyam coach. I can see what you've been eating. Ask me anything — nutrition patterns, what to add to your day, or how a specific meal looked."
+            text: "Hi! I'm your personal AI dietitian. I can see what you've been eating. Ask me anything — nutrition patterns, what to add to your day, or how a specific meal looked."
         )
     ]
     @State private var draft: String = ""

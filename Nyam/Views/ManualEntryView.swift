@@ -61,7 +61,7 @@ struct ManualEntryView: View {
                 }
 
                 Section("Nutrition") {
-                    macroField("Calories", value: $calories, unit: "kcal")
+                    macroField("Calories", value: $calories, unit: "cal")
                     macroField("Protein",  value: $protein,  unit: "g")
                     macroField("Carbs",    value: $carbs,    unit: "g")
                     macroField("Fat",      value: $fat,      unit: "g")

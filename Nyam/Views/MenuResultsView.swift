@@ -141,7 +141,7 @@ private struct DishRow: View {
                     Text("\(Int(dish.calories.rounded()))")
                         .font(.title3.bold().monospacedDigit())
                         .foregroundStyle(Color.NyamSage.shade5)
-                    Text("kcal")
+                    Text("cal")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

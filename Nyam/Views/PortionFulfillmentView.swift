@@ -181,7 +181,7 @@ struct PortionFulfillmentView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                StatCell(label: "Calories", value: "\(Int(totals.calories.rounded()))", unit: "kcal", emphasized: true)
+                StatCell(label: "Calories", value: "\(Int(totals.calories.rounded()))", unit: "cal", emphasized: true)
                 StatCell(label: "Protein",  value: "\(Int(totals.proteinG.rounded()))", unit: "g")
                 StatCell(label: "Carbs",    value: "\(Int(totals.carbsG.rounded()))", unit: "g")
                 StatCell(label: "Fat",      value: "\(Int(totals.fatG.rounded()))", unit: "g")

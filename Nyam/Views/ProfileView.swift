@@ -112,7 +112,7 @@ struct ProfileView: View {
             StatColumn(value: "\(scansThisWeek)", label: "This week")
             StatColumn(
                 value: avgCalories.map { "\($0)" } ?? "—",
-                label: "Avg kcal"
+                label: "Avg cal"
             )
         }
         .padding(.horizontal, 16)
@@ -127,7 +127,7 @@ struct ProfileView: View {
         HStack(spacing: 10) {
             StatTile(
                 icon: "trophy.fill",
-                title: "Avg kcal / meal",
+                title: "Avg cal / meal",
                 value: avgCalories.map { "\($0)" } ?? "—",
                 locked: false
             )
@@ -162,7 +162,7 @@ struct ProfileView: View {
                         .font(.headline)
                         .foregroundStyle(.primary)
                     HStack(spacing: 12) {
-                        GoalSnapshot(value: "\(Int(dailyCalorieGoal))", unit: "kcal")
+                        GoalSnapshot(value: "\(Int(dailyCalorieGoal))", unit: "cal")
                         GoalSnapshot(value: "\(Int(dailyProteinGoal))", unit: "g protein")
                     }
                 }
@@ -297,7 +297,7 @@ private struct EditGoalsSheet: View {
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.numberPad)
                             .frame(width: 90)
-                        Text("kcal")
+                        Text("cal")
                             .foregroundStyle(.secondary)
                     }
                     HStack {
@@ -313,7 +313,7 @@ private struct EditGoalsSheet: View {
                 } header: {
                     Text("Daily targets")
                 } footer: {
-                    Text("Used by the week strip and your AI coach to gauge how you're tracking. Common starting points: 1800–2500 kcal, 100–180 g protein.")
+                    Text("Used by the week strip and your AI dietitian to gauge how you're tracking. Common starting points: 1800–2500 cal, 100–180 g protein.")
                 }
             }
             .navigationTitle("Daily goals")

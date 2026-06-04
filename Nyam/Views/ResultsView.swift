@@ -85,7 +85,7 @@ private struct TotalsCard: View {
                 Text("\(Int(totals.calories.rounded()))")
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.accentColor)
-                Text("kcal")
+                Text("cal")
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
@@ -155,7 +155,7 @@ private struct ItemCard: View {
                     Text("\(Int(item.calories.rounded()))")
                         .font(.title3.bold().monospacedDigit())
                         .foregroundStyle(Color.accentColor)
-                    Text("kcal")
+                    Text("cal")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
