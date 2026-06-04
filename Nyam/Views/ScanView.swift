@@ -1,13 +1,19 @@
 import SwiftUI
 import ARKit
 import RealityKit
+import PhotosUI
 
 /// ARKit-backed scan view. Hosts a `RealityKit` `ARView` showing the live
 /// camera, watches for horizontal-plane detection, and on capture hands back
 /// the image + (optionally) the measured plate diameter in cm.
+///
+/// Also lets the user pick a photo from the Photos library — those have no
+/// ARKit data, so `onCapture` is called with `diameterCm = nil` and the
+/// parent (`CameraFlowView`) falls back to the manual CalibrationSheet.
 struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var arScan = ARScanSession()
+    @State private var libraryPickerItem: PhotosPickerItem?
     let onCapture: (UIImage, Double?) -> Void
 
     var body: some View {
@@ -47,24 +53,61 @@ struct ScanView: View {
 
                 statusBanner
 
-                Button {
-                    let result = arScan.captureScan()
-                    onCapture(result.image, result.diameterCm)
-                } label: {
-                    ZStack {
-                        Circle()
-                            .stroke(.white, lineWidth: 4)
-                            .frame(width: 80, height: 80)
-                        Circle()
-                            .fill(arScan.state == .ready ? Color.accentColor : .white)
-                            .frame(width: 66, height: 66)
+                HStack(spacing: 36) {
+                    PhotosPicker(
+                        selection: $libraryPickerItem,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 22, weight: .semibold))
+                            .frame(width: 50, height: 50)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
+                    .accessibilityLabel("Choose from Library")
+
+                    Button {
+                        let result = arScan.captureScan()
+                        onCapture(result.image, result.diameterCm)
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .stroke(.white, lineWidth: 4)
+                                .frame(width: 80, height: 80)
+                            Circle()
+                                .fill(arScan.state == .ready ? Color.accentColor : .white)
+                                .frame(width: 66, height: 66)
+                        }
+                    }
+                    .accessibilityLabel("Capture")
+
+                    // Mirror spacer so the shutter stays centered
+                    Color.clear.frame(width: 50, height: 50)
                 }
                 .padding(.bottom, 36)
             }
         }
         .onAppear { arScan.start() }
         .onDisappear { arScan.stop() }
+        .onChange(of: libraryPickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task { await loadLibraryPhoto(newItem) }
+        }
+    }
+
+    @MainActor
+    private func loadLibraryPhoto(_ item: PhotosPickerItem) async {
+        guard
+            let data = try? await item.loadTransferable(type: Data.self),
+            let image = UIImage(data: data)
+        else {
+            libraryPickerItem = nil
+            return
+        }
+        libraryPickerItem = nil
+        // Library photos have no ARKit data — diameter is nil so CameraFlow
+        // falls back to the CalibrationSheet for manual plate sizing.
+        onCapture(image, nil)
     }
 
     @ViewBuilder
