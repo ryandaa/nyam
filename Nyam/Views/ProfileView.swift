@@ -9,9 +9,15 @@ struct ProfileView: View {
     // TODO: replace with the real email once Sign in with Apple is restored.
     private let mockName = "Ryan Da"
     private let mockHandle = "@ryanda"
-    private let memberSince = "Member since June 2026"
+    private let memberSince = "Member since May"
 
     @State private var showSignOutConfirm = false
+    @State private var showEditGoals = false
+
+    /// User-settable daily targets, persisted via UserDefaults so Home,
+    /// the Coach prompt, and any future surface read the same value.
+    @AppStorage("nyam.dailyCalorieGoal") private var dailyCalorieGoal: Double = 2000
+    @AppStorage("nyam.dailyProteinGoal") private var dailyProteinGoal: Double = 150
 
     private var totalScans: Int { history.entries.count }
 
@@ -60,6 +66,12 @@ struct ProfileView: View {
                 Button("Sign out", role: .destructive) { auth.signOut() }
                 Button("Cancel", role: .cancel) {}
             }
+            .sheet(isPresented: $showEditGoals) {
+                EditGoalsSheet(
+                    calorieGoal: $dailyCalorieGoal,
+                    proteinGoal: $dailyProteinGoal
+                )
+            }
         }
         .tint(Color.NyamSage.shade5)
     }
@@ -85,16 +97,6 @@ struct ProfileView: View {
             Text(memberSince)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-
-            Button {} label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus")
-                    Text("Add School")
-                }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(Color.NyamSage.shade5)
-            }
-            .padding(.top, 4)
         }
     }
 
@@ -164,30 +166,39 @@ struct ProfileView: View {
     // MARK: - Goal card
 
     private var goalCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Set your daily calorie goal")
-                    .font(.headline)
-                Text("Pick a daily target — Nyam will compare each scan against it.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    GoalPill("1800")
-                    GoalPill("2200")
-                    GoalPill("2600")
-                    GoalPill("Custom")
+        Button {
+            showEditGoals = true
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.NyamSage.shade5.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "target")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.NyamSage.shade5)
                 }
-                .padding(.top, 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Daily goals")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    HStack(spacing: 12) {
+                        GoalSnapshot(value: "\(Int(dailyCalorieGoal))", unit: "kcal")
+                        GoalSnapshot(value: "\(Int(dailyProteinGoal))", unit: "g protein")
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
             }
-            Spacer(minLength: 0)
-            Text("🏆")
-                .font(.system(size: 44))
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+            )
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .padding(.top, 18)
     }
@@ -341,23 +352,90 @@ private struct StatTile: View {
     }
 }
 
-private struct GoalPill: View {
-    let label: String
-
-    init(_ label: String) {
-        self.label = label
-    }
+/// Inline summary of one goal in the daily-goals card.
+private struct GoalSnapshot: View {
+    let value: String
+    let unit: String
 
     var body: some View {
-        Text(label)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Text(value)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Color.NyamSage.shade5)
+            Text(unit)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Edit goals sheet
+
+private struct EditGoalsSheet: View {
+    @Binding var calorieGoal: Double
+    @Binding var proteinGoal: Double
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var caloriesText: String = ""
+    @State private var proteinText: String = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        Text("Calories")
+                        Spacer()
+                        TextField("2000", text: $caloriesText)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .frame(width: 90)
+                        Text("kcal")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Protein")
+                        Spacer()
+                        TextField("150", text: $proteinText)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .frame(width: 90)
+                        Text("g")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Daily targets")
+                } footer: {
+                    Text("Used by the week strip and your AI coach to gauge how you're tracking. Common starting points: 1800–2500 kcal, 100–180 g protein.")
+                }
+            }
+            .navigationTitle("Daily goals")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .font(.body.weight(.semibold))
+                }
+            }
+            .onAppear {
+                caloriesText = "\(Int(calorieGoal))"
+                proteinText = "\(Int(proteinGoal))"
+            }
+        }
+        .tint(Color.NyamSage.shade5)
+    }
+
+    private func save() {
+        if let c = Double(caloriesText.trimmingCharacters(in: .whitespaces)), c >= 500, c <= 8000 {
+            calorieGoal = c
+        }
+        if let p = Double(proteinText.trimmingCharacters(in: .whitespaces)), p >= 10, p <= 500 {
+            proteinGoal = p
+        }
+        dismiss()
     }
 }
 

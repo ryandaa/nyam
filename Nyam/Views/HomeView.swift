@@ -8,19 +8,16 @@ struct HomeView: View {
 
     @State private var showManualEntry = false
 
-    // V1 defaults — could become user-settable in Profile later.
-    private let dailyCalorieGoal: Double = 2000
-    private let dailyProteinGoal: Double = 150
-    private let dailyFiberGoal: Double = 30
-    private let dailySodiumLimit: Double = 2300   // upper limit (less = better)
+    /// User-settable daily calorie target — edited in Profile, picked up here
+    /// for the week-strip ring progress. Defaults to 2000 kcal until the user
+    /// chooses their own.
+    @AppStorage("nyam.dailyCalorieGoal") private var dailyCalorieGoal: Double = 2000
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     weekStrip
-                    calorieHero
-                    macroCardsRow
                     recentlyUploaded
                 }
                 .padding(.top, 4)
@@ -89,25 +86,6 @@ struct HomeView: View {
         }
     }
 
-    private var todayEntries: [HistoryEntry] {
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        return history.entries.filter { cal.isDate($0.date, inSameDayAs: today) }
-    }
-
-    private var todayCalories: Double {
-        todayEntries.reduce(0.0) { $0 + $1.result.totals.calories }
-    }
-    private var todayProtein: Double {
-        todayEntries.reduce(0.0) { $0 + $1.result.totals.proteinG }
-    }
-    private var todayFiber: Double {
-        todayEntries.reduce(0.0) { $0 + $1.result.totals.fiberG }
-    }
-    private var todaySodium: Double {
-        todayEntries.reduce(0.0) { $0 + $1.result.totals.sodiumMg }
-    }
-
     /// Strict streak: number of consecutive days back from today that have
     /// at least one logged meal. If today has none, streak = 0.
     private var currentStreak: Int {
@@ -125,87 +103,29 @@ struct HomeView: View {
     // MARK: - Sections
 
     private var weekStrip: some View {
-        HStack(spacing: 8) {
-            ForEach(weekDays) { day in
-                DayRing(
-                    day: day,
-                    progress: day.calories / dailyCalorieGoal
-                )
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-    }
+        VStack(alignment: .leading, spacing: 10) {
+            Text(weekHeaderText)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .padding(.leading, 4)
 
-    private var calorieHero: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(Int(todayCalories.rounded()))")
-                        .font(.system(size: 44, weight: .bold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(.primary)
-                    Text("/\(Int(dailyCalorieGoal))")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ForEach(weekDays) { day in
+                    DayRing(
+                        day: day,
+                        progress: day.calories / dailyCalorieGoal
+                    )
+                    .frame(maxWidth: .infinity)
                 }
-                Text("Calories eaten")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            ProgressRing(
-                progress: todayCalories / dailyCalorieGoal,
-                lineWidth: 8,
-                size: 76,
-                trackColor: Color.NyamSage.tint7,
-                fillColor: Color.NyamSage.shade4
-            ) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(Color.NyamSage.shade5)
             }
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color(.separator).opacity(0.6), lineWidth: 1)
-        )
         .padding(.horizontal, 16)
-        .padding(.top, 18)
+        .padding(.top, 14)
     }
 
-    private var macroCardsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                MacroCard(
-                    title: "Protein",
-                    current: todayProtein,
-                    goal: dailyProteinGoal,
-                    unit: "g",
-                    icon: "fish",
-                    invert: false
-                )
-                MacroCard(
-                    title: "Fiber",
-                    current: todayFiber,
-                    goal: dailyFiberGoal,
-                    unit: "g",
-                    icon: "leaf",
-                    invert: false
-                )
-                MacroCard(
-                    title: "Sodium",
-                    current: todaySodium,
-                    goal: dailySodiumLimit,
-                    unit: "mg",
-                    icon: "drop",
-                    invert: true     // sodium is "stay under," progress fills as you approach the limit
-                )
-            }
-            .padding(.horizontal, 16)
-        }
-        .padding(.top, 14)
+    /// "June 2026" — wide month + year of the current week's anchor day.
+    private var weekHeaderText: String {
+        weekStart.formatted(.dateTime.month(.wide).year())
     }
 
     private var recentlyUploaded: some View {
@@ -305,96 +225,6 @@ private struct StreakChip: View {
         .background(
             Capsule()
                 .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Calorie / macro progress ring
-
-private struct ProgressRing<Center: View>: View {
-    let progress: Double
-    let lineWidth: CGFloat
-    let size: CGFloat
-    let trackColor: Color
-    let fillColor: Color
-    @ViewBuilder let center: () -> Center
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(trackColor, lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: min(max(progress, 0), 1))
-                .stroke(fillColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.25), value: progress)
-            center()
-        }
-        .frame(width: size, height: size)
-    }
-}
-
-// MARK: - Macro card
-
-private struct MacroCard: View {
-    let title: String
-    let current: Double
-    let goal: Double
-    let unit: String
-    let icon: String
-    /// True for "stay under" metrics (e.g. sodium) — progress is the same
-    /// fraction but the visual cue (color) emphasizes the cap rather than
-    /// completion.
-    let invert: Bool
-
-    private var progress: Double { goal > 0 ? current / goal : 0 }
-
-    private var ringColor: Color {
-        if invert {
-            // Sodium: light at low intake, darkens as you approach the cap
-            return progress < 0.5 ? Color.NyamSage.tint3
-                : progress < 0.9 ? Color.NyamSage.primary
-                : Color.NyamSage.shade3
-        }
-        return Color.NyamSage.shade4
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("\(Int(current.rounded()))")
-                            .font(.system(size: 18, weight: .bold, design: .rounded).monospacedDigit())
-                        Text("/\(Int(goal))\(unit)")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 4)
-            }
-
-            ProgressRing(
-                progress: progress,
-                lineWidth: 6,
-                size: 56,
-                trackColor: Color.NyamSage.tint7,
-                fillColor: ringColor
-            ) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundStyle(ringColor)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .padding(14)
-        .frame(width: 140)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color(.separator).opacity(0.6), lineWidth: 1)
         )
     }
 }
