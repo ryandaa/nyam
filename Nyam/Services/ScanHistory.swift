@@ -46,6 +46,20 @@ final class ScanHistory: ObservableObject {
         persist()
     }
 
+    /// Replace the result on an existing entry — used when the user edits
+    /// an item from ResultsView. Image and date stay the same.
+    func updateResult(entryId: UUID, result: ScanResult) {
+        guard let i = entries.firstIndex(where: { $0.id == entryId }) else { return }
+        let old = entries[i]
+        entries[i] = HistoryEntry(
+            id: old.id,
+            date: old.date,
+            result: result,
+            imagePath: old.imagePath
+        )
+        persist()
+    }
+
     func clear() {
         entries.removeAll()
         UserDefaults.standard.removeObject(forKey: Self.storageKey)

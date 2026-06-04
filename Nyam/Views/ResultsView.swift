@@ -1,14 +1,28 @@
 import SwiftUI
 
 struct ResultsView: View {
-    let result: ScanResult
+    @EnvironmentObject var history: ScanHistory
+
+    let initialResult: ScanResult
     /// When non-nil, the top-right "Scan again" button is shown — used for the
     /// fresh-scan flow. Pass nil when this view is pushed from history (the
     /// nav-stack back button handles dismissal).
     let onScanAgain: (() -> Void)?
+    /// When non-nil, per-item edits persist back to the matching ScanHistory
+    /// entry. Nil for previews / hypothetical results not in history.
+    let historyEntryId: UUID?
+
+    @State private var workingResult: ScanResult
+
+    init(result: ScanResult, onScanAgain: (() -> Void)? = nil, historyEntryId: UUID? = nil) {
+        self.initialResult = result
+        self.onScanAgain = onScanAgain
+        self.historyEntryId = historyEntryId
+        self._workingResult = State(initialValue: result)
+    }
 
     private var navTitle: String {
-        if let t = result.title, !t.isEmpty { return t }
+        if let t = workingResult.title, !t.isEmpty { return t }
         return "Your plate"
     }
 
@@ -30,29 +44,73 @@ struct ResultsView: View {
     private var content: some View {
         if onScanAgain != nil {
             // Fresh-scan flow: wrap in its own NavigationStack so the toolbar shows.
-            NavigationStack { scrollBody }
+            NavigationStack {
+                scrollBody
+                    .navigationDestination(for: Int.self) { index in
+                        itemDetail(at: index)
+                    }
+            }
         } else {
             // Pushed from a parent stack (history): inherit that stack.
             scrollBody
+                .navigationDestination(for: Int.self) { index in
+                    itemDetail(at: index)
+                }
         }
     }
 
     private var scrollBody: some View {
         ScrollView {
             VStack(spacing: 14) {
-                TotalsCard(totals: result.totals)
+                TotalsCard(totals: workingResult.totals)
                     .padding(.top, 8)
 
-                if result.items.isEmpty {
+                if workingResult.items.isEmpty {
                     emptyState
                 } else {
-                    ForEach(result.items) { item in
-                        ItemCard(item: item)
+                    ForEach(Array(workingResult.items.enumerated()), id: \.offset) { index, item in
+                        NavigationLink(value: index) {
+                            ItemCard(item: item)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 100)
+        }
+    }
+
+    @ViewBuilder
+    private func itemDetail(at index: Int) -> some View {
+        if workingResult.items.indices.contains(index) {
+            ItemDetailView(
+                item: workingResult.items[index],
+                onSave: { updated in updateItem(updated, at: index) }
+            )
+        }
+    }
+
+    private func updateItem(_ updated: ScanItem, at index: Int) {
+        guard workingResult.items.indices.contains(index) else { return }
+        var newItems = workingResult.items
+        newItems[index] = updated
+        let newTotals = ScanTotals(
+            calories: newItems.reduce(0) { $0 + $1.calories },
+            proteinG: newItems.reduce(0) { $0 + $1.proteinG },
+            carbsG:   newItems.reduce(0) { $0 + $1.carbsG },
+            fatG:     newItems.reduce(0) { $0 + $1.fatG },
+            fiberG:   newItems.reduce(0) { $0 + $1.fiberG },
+            sodiumMg: newItems.reduce(0) { $0 + $1.sodiumMg }
+        )
+        workingResult = ScanResult(
+            plateDetected: workingResult.plateDetected,
+            title: workingResult.title,
+            items: newItems,
+            totals: newTotals
+        )
+        if let historyEntryId {
+            history.updateResult(entryId: historyEntryId, result: workingResult)
         }
     }
 

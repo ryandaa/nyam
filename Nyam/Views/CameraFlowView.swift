@@ -12,6 +12,9 @@ struct CameraFlowView: View {
 
     @State private var analyzing: AnalyzingFoodScan?
     @State private var result: ScanResult?
+    /// History entry id for the just-recorded scan — passed to ResultsView so
+    /// per-item edits in the fresh-scan flow also persist to ScanHistory.
+    @State private var resultHistoryId: UUID?
     @State private var errorMessage: String?
 
     // Menu-mode state
@@ -44,8 +47,10 @@ struct CameraFlowView: View {
                         result: result,
                         onScanAgain: {
                             self.result = nil
+                            self.resultHistoryId = nil
                             self.analyzing = nil
-                        }
+                        },
+                        historyEntryId: resultHistoryId
                     )
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
@@ -154,9 +159,10 @@ struct CameraFlowView: View {
                 foodVolumeCm3: scan.foodVolumeCm3,
                 identityToken: auth.identityToken
             )
-            history.record(newResult, image: scan.image)
+            let entry = history.record(newResult, image: scan.image)
             analyzing = nil
             result = newResult
+            resultHistoryId = entry.id
         } catch {
             errorMessage = error.localizedDescription
             analyzing = nil

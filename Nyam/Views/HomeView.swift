@@ -40,7 +40,7 @@ struct HomeView: View {
                 }
             }
             .navigationDestination(for: HistoryEntry.self) { entry in
-                ResultsView(result: entry.result, onScanAgain: nil)
+                ResultsView(result: entry.result, onScanAgain: nil, historyEntryId: entry.id)
             }
         }
         .tint(Color.NyamSage.shade5)

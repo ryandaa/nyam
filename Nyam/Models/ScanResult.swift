@@ -30,7 +30,7 @@ enum NutritionSource: String, Codable, Equatable {
     case openFoodFacts = "open_food_facts"
 }
 
-struct ScanItem: Codable, Equatable, Identifiable {
+struct ScanItem: Codable, Equatable, Identifiable, Hashable {
     var id: String { name }
     let name: String
     let plateAreaPercent: Double
