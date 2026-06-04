@@ -54,7 +54,7 @@ struct HomeView: View {
         return cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: today)) ?? today
     }
 
-    private struct DayEntry: Identifiable {
+    fileprivate struct DayEntry: Identifiable {
         let id = UUID()
         let date: Date
         let dayShortName: String   // "Sun"
