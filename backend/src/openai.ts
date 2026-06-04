@@ -67,13 +67,26 @@ export async function analyzePlate(
   imageBase64: string,
   plateDiameterCm: number,
   apiKey: string,
+  foodVolumeCm3?: number,
 ): Promise<ScanResult> {
   const plateAreaCm2 = Math.PI * Math.pow(plateDiameterCm / 2, 2);
-  const userText =
+  const lines: string[] = [
     `Plate diameter: ${plateDiameterCm.toFixed(1)} cm ` +
-    `(plate area ≈ ${plateAreaCm2.toFixed(0)} cm²). ` +
+      `(plate area ≈ ${plateAreaCm2.toFixed(0)} cm²).`,
+  ];
+  if (foodVolumeCm3 && foodVolumeCm3 > 0) {
+    lines.push(
+      `MEASURED TOTAL FOOD VOLUME (from LiDAR depth scan): ${foodVolumeCm3.toFixed(0)} cm³. ` +
+        `This is the actual cubic-centimeter sum of everything above the plate plane, measured by the iPhone's depth sensor — NOT an estimate. ` +
+        `Treat this as a strong constraint: the sum of your per-item (width × depth × height) cm³ values, weighted by typical curvature, should be within ±15% of this measured total. ` +
+        `Adjust per-item heights to fit the measured total before computing grams.`,
+    );
+  }
+  lines.push(
     `Identify every visible food item and return the structured nutrition result. ` +
-    `Anchor every gram estimate to this plate area.`;
+      `Anchor every gram estimate to this plate area.`,
+  );
+  const userText = lines.join(" ");
 
   const body = {
     model: "gpt-4o-2024-08-06",
