@@ -318,8 +318,7 @@ struct MealRow: View {
                     .padding(.top, 2)
             }
 
-            HStack(spacing: 22) {
-                Image(systemName: "paperplane")
+            HStack {
                 Spacer()
                 Menu {
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
@@ -327,10 +326,10 @@ struct MealRow: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(.primary)
                 }
             }
-            .font(.system(size: 18, weight: .regular))
-            .foregroundStyle(.primary)
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 14)

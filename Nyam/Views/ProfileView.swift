@@ -32,14 +32,26 @@ struct ProfileView: View {
         return Int((sum / Double(totalScans)).rounded())
     }
 
+    /// Same strict-streak definition as HomeView's chip: consecutive days
+    /// back from today with at least one logged meal. 0 if today has none.
+    private var currentStreak: Int {
+        let cal = Calendar.current
+        var streak = 0
+        var checkDate = cal.startOfDay(for: Date())
+        while history.entries.contains(where: { cal.isDate($0.date, inSameDayAs: checkDate) }) {
+            streak += 1
+            guard let prev = cal.date(byAdding: .day, value: -1, to: checkDate) else { break }
+            checkDate = prev
+        }
+        return streak
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
                     header
                     statsRow
-                    actionPills
-                    listSection
                     tileRow
                     goalCard
                     Spacer(minLength: 12)
@@ -52,14 +64,6 @@ struct ProfileView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Text(mockName)
                         .font(.title2.weight(.bold))
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 14) {
-                        Image(systemName: "square.and.arrow.up")
-                        Image(systemName: "line.3.horizontal")
-                    }
-                    .font(.title3)
-                    .foregroundStyle(.primary)
                 }
             }
             .confirmationDialog("Sign out?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
@@ -117,31 +121,6 @@ struct ProfileView: View {
 
     // MARK: - Pill buttons row
 
-    private var actionPills: some View {
-        HStack(spacing: 10) {
-            PillButton("Edit profile") {}
-            PillButton("Share profile") {}
-            PillButton(systemImage: "chevron.down") {}
-                .fixedSize()
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 18)
-    }
-
-    // MARK: - List with circular icons
-
-    private var listSection: some View {
-        VStack(spacing: 0) {
-            ListRow(icon: "checkmark", label: "Logged Meals", value: "\(totalScans)")
-            Divider().padding(.leading, 56)
-            ListRow(icon: "bookmark", label: "Goals", value: "—", locked: true)
-            Divider().padding(.leading, 56)
-            ListRow(icon: "gearshape", label: "Settings", value: "", locked: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 24)
-    }
-
     // MARK: - Tile row (Rank + Streak)
 
     private var tileRow: some View {
@@ -155,7 +134,7 @@ struct ProfileView: View {
             StatTile(
                 icon: "flame.fill",
                 title: "Current Streak",
-                value: "0 days",
+                value: "\(currentStreak) day\(currentStreak == 1 ? "" : "s")",
                 locked: false
             )
         }
@@ -239,78 +218,6 @@ private struct StatColumn: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-private struct PillButton: View {
-    let title: String?
-    let systemImage: String?
-    let action: () -> Void
-
-    init(_ title: String, action: @escaping () -> Void) {
-        self.title = title
-        self.systemImage = nil
-        self.action = action
-    }
-
-    init(systemImage: String, action: @escaping () -> Void) {
-        self.title = nil
-        self.systemImage = systemImage
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                if let title { Text(title) }
-                if let systemImage { Image(systemName: systemImage) }
-            }
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.primary)
-            .frame(maxWidth: title == nil ? nil : .infinity)
-            .padding(.horizontal, title == nil ? 16 : 8)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color(.separator), lineWidth: 1)
-            )
-        }
-    }
-}
-
-private struct ListRow: View {
-    let icon: String
-    let label: String
-    let value: String
-    var locked: Bool = false
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .stroke(Color.NyamSage.shade5, lineWidth: 1.5)
-                    .frame(width: 36, height: 36)
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.NyamSage.shade5)
-            }
-            Text(label)
-                .font(.body.weight(.semibold))
-            Spacer()
-            if locked {
-                Image(systemName: "lock.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else if !value.isEmpty {
-                Text(value)
-                    .font(.body.monospacedDigit())
-                    .foregroundStyle(.primary)
-            }
-            Image(systemName: "chevron.right")
-                .font(.footnote)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 14)
     }
 }
 
