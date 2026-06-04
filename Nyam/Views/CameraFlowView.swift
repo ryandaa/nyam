@@ -18,11 +18,13 @@ struct CameraFlowView: View {
     @State private var errorMessage: String?
 
     /// Captured frame for which ARKit returned a confident diameter — we go
-    /// straight to /scan, no manual sheet.
+    /// straight to /scan, no manual sheet. `foodVolumeCm3` is present only
+    /// on LiDAR-capable Pro phones.
     private struct AnalyzingScan: Identifiable {
         let id = UUID()
         let image: UIImage
         let diameterCm: Double
+        let foodVolumeCm3: Double?
     }
 
     var body: some View {
@@ -44,7 +46,7 @@ struct CameraFlowView: View {
                     }
                 }
             } else {
-                ScanView(onCapture: handleCapture(image:diameterCm:))
+                ScanView(onCapture: handleCapture(measurement:))
                     .sheet(item: $pendingCalibration) { photo in
                         CalibrationSheet(
                             image: photo.image,
@@ -75,14 +77,18 @@ struct CameraFlowView: View {
         .animation(.easeInOut(duration: 0.18), value: analyzing != nil)
     }
 
-    private func handleCapture(image: UIImage, diameterCm: Double?) {
-        if let diameterCm {
-            let scan = AnalyzingScan(image: image, diameterCm: diameterCm)
+    private func handleCapture(measurement: ARMeasurement) {
+        if let diameterCm = measurement.diameterCm {
+            let scan = AnalyzingScan(
+                image: measurement.image,
+                diameterCm: diameterCm,
+                foodVolumeCm3: measurement.foodVolumeCm3
+            )
             analyzing = scan
             Task { await runDirectScan(scan) }
         } else {
             // ARKit couldn't measure — fall back to manual calibration sheet.
-            pendingCalibration = CapturedPhoto(image: image)
+            pendingCalibration = CapturedPhoto(image: measurement.image)
         }
     }
 
@@ -92,6 +98,7 @@ struct CameraFlowView: View {
             let newResult = try await NyamAPI.scan(
                 image: scan.image,
                 plateDiameterCm: scan.diameterCm,
+                foodVolumeCm3: scan.foodVolumeCm3,
                 identityToken: auth.identityToken
             )
             history.record(newResult, image: scan.image)

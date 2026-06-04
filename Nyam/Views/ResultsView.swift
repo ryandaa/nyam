@@ -142,12 +142,13 @@ private struct ItemCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(item.name.capitalized)
                         .font(.headline)
                     Text("\(Int(item.estimatedGrams.rounded()))g · \(String(format: "%.0f", item.plateAreaPercent))% of plate")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    NutritionSourceBadge(item: item)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
@@ -171,6 +172,42 @@ private struct ItemCard: View {
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// Small chip in the corner of each item card showing where the nutrition
+/// numbers came from. "USDA" means the macros were scaled from FoodData
+/// Central's per-100g values; "Estimate" means USDA had no good match and
+/// these are the vision model's own numbers.
+private struct NutritionSourceBadge: View {
+    let item: ScanItem
+
+    var body: some View {
+        switch item.nutritionSource {
+        case .usda:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.caption2)
+                Text("USDA")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(Color.accentColor)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Color.accentColor.opacity(0.12), in: Capsule())
+            .help(item.usdaDescription ?? "Nutrition from USDA FoodData Central")
+        case .model, .none:
+            HStack(spacing: 4) {
+                Image(systemName: "sparkles")
+                    .font(.caption2)
+                Text("AI estimate")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Color(.tertiarySystemBackground), in: Capsule())
+        }
     }
 }
 

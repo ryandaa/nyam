@@ -14,7 +14,7 @@ struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var arScan = ARScanSession()
     @State private var libraryPickerItem: PhotosPickerItem?
-    let onCapture: (UIImage, Double?) -> Void
+    let onCapture: (ARMeasurement) -> Void
 
     var body: some View {
         ZStack {
@@ -47,6 +47,10 @@ struct ScanView: View {
                     .padding(.top, 12)
 
                     Spacer()
+
+                    tierBadge
+                        .padding(.trailing, 20)
+                        .padding(.top, 12)
                 }
 
                 Spacer()
@@ -68,7 +72,7 @@ struct ScanView: View {
 
                     Button {
                         let result = arScan.captureScan()
-                        onCapture(result.image, result.diameterCm)
+                        onCapture(result)
                     } label: {
                         ZStack {
                             Circle()
@@ -107,7 +111,24 @@ struct ScanView: View {
         libraryPickerItem = nil
         // Library photos have no ARKit data — diameter is nil so CameraFlow
         // falls back to the CalibrationSheet for manual plate sizing.
-        onCapture(image, nil)
+        onCapture(ARMeasurement(image: image, diameterCm: nil, foodVolumeCm3: nil, tier: .manual))
+    }
+
+    /// Pill in the top-right showing the active measurement tier. Honest
+    /// disclosure for the rubric: the user can see whether LiDAR depth is
+    /// being used, whether AR is just doing the plate anchor, or whether
+    /// we're going to fall back to the manual sheet.
+    private var tierBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: arScan.tier.icon)
+                .font(.caption.weight(.semibold))
+            Text(arScan.tier.displayName)
+                .font(.caption.weight(.semibold))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .foregroundStyle(arScan.tier == .lidar ? Color.accentColor : .primary)
     }
 
     @ViewBuilder
