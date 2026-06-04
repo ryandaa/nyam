@@ -17,7 +17,10 @@ struct HomeView: View {
                         LazyVStack(spacing: 16) {
                             ForEach(history.entries) { entry in
                                 NavigationLink(value: entry) {
-                                    MealCard(entry: entry)
+                                    MealCard(
+                                        entry: entry,
+                                        onDelete: { history.delete(entry) }
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -25,6 +28,7 @@ struct HomeView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
                         .padding(.bottom, 96) // leave room for the floating + button
+                        .animation(.easeInOut(duration: 0.22), value: history.entries.count)
                     }
                 }
             }
@@ -72,6 +76,9 @@ private struct EmptyHomeState: View {
 
 private struct MealCard: View {
     let entry: HistoryEntry
+    let onDelete: () -> Void
+
+    @State private var showDeleteConfirm = false
 
     /// Title from the model when available; falls back to the top-calorie
     /// food name for pre-title v2 history entries.
@@ -83,6 +90,10 @@ private struct MealCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             heroImage
+                .overlay(alignment: .topTrailing) {
+                    cardMenu
+                        .padding(10)
+                }
 
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -112,6 +123,37 @@ private struct MealCard: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.accentColor.opacity(0.12), lineWidth: 1)
         )
+        .confirmationDialog(
+            "Delete this meal?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive, action: onDelete)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(displayTitle) will be removed from your history. This can't be undone.")
+        }
+    }
+
+    /// Floating ... button in the top-right corner of the hero. Visible on
+    /// any photo via a dark translucent pill. Menu intercepts its own taps
+    /// so the wrapping NavigationLink doesn't fire on hit.
+    private var cardMenu: some View {
+        Menu {
+            Button(role: .destructive) {
+                showDeleteConfirm = true
+            } label: {
+                Label("Delete meal", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 14, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(.black.opacity(0.45), in: Circle())
+        }
+        // Make the tap target stay within the icon, not bleed into the card.
+        .contentShape(Circle())
     }
 
     @ViewBuilder
@@ -176,6 +218,7 @@ private struct StatChip: View {
 #Preview("With entries") {
     let history = ScanHistory()
     history.record(.preview, image: nil)
+    history.record(.preview, image: nil)
     return HomeView()
         .environmentObject(history)
 }
@@ -183,4 +226,13 @@ private struct StatChip: View {
 #Preview("Empty") {
     HomeView()
         .environmentObject(ScanHistory())
+}
+
+#Preview("MealCard alone") {
+    MealCard(
+        entry: HistoryEntry(result: .preview),
+        onDelete: { print("delete") }
+    )
+    .padding()
+    .background(Color(.systemBackground))
 }
