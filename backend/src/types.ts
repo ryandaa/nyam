@@ -14,6 +14,21 @@ export interface ScanRequest {
   food_volume_cm3?: number;
 }
 
+export interface ChatRequest {
+  messages: { role: "user" | "assistant"; content: string }[];
+  history_summary: {
+    title: string;
+    date: string;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    fiber_g: number;
+    sodium_mg: number;
+    items: string[];
+  }[];
+}
+
 export type NutritionSource = "usda" | "model";
 
 export interface ScanItem {

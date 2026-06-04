@@ -1,7 +1,8 @@
 import { verifyAppleIdentityToken } from "./auth";
 import { analyzePlate } from "./openai";
 import { lookupFoods, scaleByGrams } from "./usda";
-import type { Env, NutritionSource, ScanItem, ScanRequest, ScanResult } from "./types";
+import { chatWithCoach } from "./chat";
+import type { ChatRequest, Env, NutritionSource, ScanItem, ScanRequest, ScanResult } from "./types";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -115,6 +116,51 @@ function round(value: number, places: number): number {
   return Math.round(value * m) / m;
 }
 
+async function handleChat(request: Request, env: Env, url: URL): Promise<Response> {
+  // Same auth posture as /scan — Bearer token required unless ?dev=1.
+  const token = bearer(request);
+  const skipAuth = url.searchParams.get("dev") === "1" && env.APPLE_AUDIENCE === "ai.gojuly.nyam";
+  if (!token && !skipAuth) {
+    return json({ error: "Missing Authorization: Bearer <appleIdentityToken>" }, 401);
+  }
+  if (token) {
+    try {
+      await verifyAppleIdentityToken(token, env.APPLE_AUDIENCE);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Auth failed";
+      if (!skipAuth) {
+        return json({ error: `Auth failed: ${message}` }, 401);
+      }
+    }
+  }
+
+  let body: ChatRequest;
+  try {
+    body = (await request.json()) as ChatRequest;
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+    return json({ error: "messages: non-empty array required" }, 400);
+  }
+  if (!Array.isArray(body.history_summary)) {
+    return json({ error: "history_summary: array required (use [] if no history)" }, 400);
+  }
+
+  if (!env.OPENAI_API_KEY) {
+    return json({ error: "Server is missing OPENAI_API_KEY" }, 500);
+  }
+
+  try {
+    const reply = await chatWithCoach(body.messages, body.history_summary, env.OPENAI_API_KEY);
+    return json({ reply });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Chat failed";
+    console.error("chat error:", message);
+    return json({ error: message }, 502);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -130,6 +176,10 @@ export default {
         service: "nyam-backend",
         usda_configured: Boolean(env.USDA_API_KEY),
       });
+    }
+
+    if (request.method === "POST" && url.pathname === "/chat") {
+      return handleChat(request, env, url);
     }
 
     if (request.method !== "POST" || url.pathname !== "/scan") {
