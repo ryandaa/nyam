@@ -24,6 +24,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -32,6 +33,29 @@ from typing import Any
 DEFAULT_URL = os.environ.get("NYAM_URL", "https://nyam-backend.ryandaa.workers.dev")
 DEFAULT_DIAMETER_CM = 26.0
 TIMEOUT_SEC = 90
+
+
+def maybe_convert_heic(path: str) -> str:
+    """OpenAI's vision API doesn't accept HEIC. iPhone photos are HEIC by
+    default. If we got one, convert to JPEG with macOS's built-in `sips`
+    tool and return the new path. Cached: re-using the same input skips
+    the conversion the second time.
+    """
+    lower = path.lower()
+    if not (lower.endswith(".heic") or lower.endswith(".heif")):
+        return path
+    jpeg_path = os.path.splitext(path)[0] + ".jpg"
+    if os.path.exists(jpeg_path):
+        return jpeg_path
+    print(f"(converting HEIC → JPEG: {os.path.basename(jpeg_path)})")
+    result = subprocess.run(
+        ["sips", "-s", "format", "jpeg", path, "--out", jpeg_path],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"sips conversion failed: {result.stderr.strip()}")
+    return jpeg_path
 
 
 def post_scan(image_path: str, diameter_cm: float, base_url: str) -> dict[str, Any]:
@@ -44,7 +68,12 @@ def post_scan(image_path: str, diameter_cm: float, base_url: str) -> dict[str, A
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            # Cloudflare's Browser Integrity Check blocks the default
+            # `Python-urllib/3.x` UA with a 1010 — set a benign one.
+            "User-Agent": "nyam-cli/1.0 (+https://github.com/ryandaa/nyam)",
+        },
         method="POST",
     )
     try:
@@ -117,6 +146,7 @@ def main() -> None:
     image_path = sys.argv[1]
     if not os.path.isfile(image_path):
         raise SystemExit(f"file not found: {image_path}")
+    image_path = maybe_convert_heic(image_path)
 
     diameter = float(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_DIAMETER_CM
 
