@@ -58,3 +58,8 @@ backend/.dev.vars
 __pycache__/
 *.pyc
 .venv/
+
+# Ad-hoc test images — keep the folder structure but ignore the binaries
+samples/*
+!samples/README.md
+!samples/.gitkeep

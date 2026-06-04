@@ -66,28 +66,46 @@ def print_table(result: dict[str, Any]) -> None:
         return
 
     name_w = max(len("FOOD"), max(len(item["name"]) for item in items))
-    print(f"\n{'FOOD':{name_w}}  {'GRAMS':>6}  {'KCAL':>6}  {'P':>5}  {'C':>5}  {'F':>5}  {'PLATE%':>7}")
-    print("-" * (name_w + 50))
+
+    # Sizing table — the V2 "we measured your food" story
+    print("\n— Sizes (the plate-anchored measurement)")
+    print(f"{'FOOD':{name_w}}  {'W·D·H (cm)':>14}  {'PLATE%':>7}  {'GRAMS':>6}")
+    print("-" * (name_w + 36))
+    for item in items:
+        dims = f"{item.get('width_cm', 0):.1f}×{item.get('depth_cm', 0):.1f}×{item.get('height_cm', 0):.1f}"
+        print(
+            f"{item['name']:{name_w}}  {dims:>14}  "
+            f"{item['plate_area_percent']:>6.0f}%  "
+            f"{int(round(item['estimated_grams'])):>6}"
+        )
+
+    # Nutrition table
+    print("\n— Nutrition (per item)")
+    print(
+        f"{'FOOD':{name_w}}  {'KCAL':>6}  {'P':>5}  {'C':>5}  {'F':>5}  {'FI':>5}  {'Na(mg)':>7}"
+    )
+    print("-" * (name_w + 44))
     for item in items:
         print(
             f"{item['name']:{name_w}}  "
-            f"{int(round(item['estimated_grams'])):>6}  "
             f"{int(round(item['calories'])):>6}  "
             f"{item['protein_g']:>5.1f}  "
             f"{item['carbs_g']:>5.1f}  "
             f"{item['fat_g']:>5.1f}  "
-            f"{item['plate_area_percent']:>6.0f}%"
+            f"{item.get('fiber_g', 0):>5.1f}  "
+            f"{int(round(item.get('sodium_mg', 0))):>7}"
         )
 
     totals = result["totals"]
-    print("-" * (name_w + 50))
+    print("-" * (name_w + 44))
     print(
         f"{'TOTAL':{name_w}}  "
-        f"{'':>6}  "
         f"{int(round(totals['calories'])):>6}  "
         f"{totals['protein_g']:>5.1f}  "
         f"{totals['carbs_g']:>5.1f}  "
-        f"{totals['fat_g']:>5.1f}"
+        f"{totals['fat_g']:>5.1f}  "
+        f"{totals.get('fiber_g', 0):>5.1f}  "
+        f"{int(round(totals.get('sodium_mg', 0))):>7}"
     )
 
 
