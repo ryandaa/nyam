@@ -14,14 +14,15 @@ struct RootTabView: View {
     @State private var showCameraFlow = false
 
     enum Tab {
-        case home, profile
+        case home, summary, profile
     }
 
     var body: some View {
         VStack(spacing: 0) {
             Group {
                 switch selectedTab {
-                case .home: HomeView()
+                case .home:    HomeView()
+                case .summary: SummaryView()
                 case .profile: ProfileView()
                 }
             }
@@ -48,57 +49,70 @@ private struct BottomBar: View {
     let onCenterTap: () -> Void
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // Background bar
-            HStack(spacing: 0) {
-                TabBarButton(
-                    icon: "house.fill",
-                    label: "Home",
-                    isActive: selected == .home
-                ) { selected = .home }
+        HStack(spacing: 0) {
+            TabBarButton(
+                icon: "newspaper",
+                activeIcon: "newspaper.fill",
+                label: "Home",
+                isActive: selected == .home
+            ) { selected = .home }
 
-                // Spacer reserved for the floating "+" button
-                Spacer().frame(maxWidth: .infinity)
+            TabBarButton(
+                icon: "square.grid.3x3",
+                activeIcon: "square.grid.3x3.fill",
+                label: "Summary",
+                isActive: selected == .summary
+            ) { selected = .summary }
 
-                TabBarButton(
-                    icon: "person.fill",
-                    label: "Profile",
-                    isActive: selected == .profile
-                ) { selected = .profile }
-            }
-            .padding(.top, 10)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 4)
-            .background(
-                Color(.systemBackground)
-                    .overlay(
-                        Rectangle()
-                            .frame(height: 0.5)
-                            .foregroundStyle(Color(.separator)),
-                        alignment: .top
-                    )
-                    .ignoresSafeArea(edges: .bottom)
-            )
+            CenterButton(onTap: onCenterTap)
 
-            // Center "+" button — slightly elevated like Beli's, no heavy shadow
-            Button(action: onCenterTap) {
-                ZStack {
-                    Circle()
-                        .fill(Color.NyamSage.shade5)
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-            }
-            .accessibilityLabel("Scan a meal")
-            .offset(y: -14)
+            TabBarButton(
+                icon: "person",
+                activeIcon: "person.fill",
+                label: "Profile",
+                isActive: selected == .profile
+            ) { selected = .profile }
         }
+        .padding(.top, 10)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 4)
+        .background(
+            Color(.systemBackground)
+                .overlay(
+                    Rectangle()
+                        .frame(height: 0.5)
+                        .foregroundStyle(Color(.separator)),
+                    alignment: .top
+                )
+                .ignoresSafeArea(edges: .bottom)
+        )
+    }
+}
+
+/// Center "+" button — sits in its own slot like Beli, slightly elevated.
+private struct CenterButton: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack {
+                Circle()
+                    .fill(Color.NyamSage.shade5)
+                    .frame(width: 56, height: 56)
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(maxWidth: .infinity, maxHeight: 56)
+        }
+        .accessibilityLabel("Scan a meal")
+        .offset(y: -8)
     }
 }
 
 private struct TabBarButton: View {
     let icon: String
+    let activeIcon: String
     let label: String
     let isActive: Bool
     let action: () -> Void
@@ -106,7 +120,7 @@ private struct TabBarButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(systemName: isActive ? activeIcon : icon)
                     .font(.system(size: 20, weight: .regular))
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
