@@ -87,12 +87,11 @@ final class ARScanSession: NSObject, ObservableObject, ARSessionDelegate {
             y: plate.center.y * imgSize.height
         )
 
-        guard let query = frame.raycastQuery(
+        let query = frame.raycastQuery(
             from: centerPx,
             allowing: .estimatedPlane,
             alignment: .horizontal
-        ) else { return nil }
-
+        )
         let results = session.raycast(query)
         guard let hit = results.first else { return nil }
 
