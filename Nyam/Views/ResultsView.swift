@@ -71,6 +71,7 @@ struct ResultsView: View {
                     ForEach(Array(workingResult.items.enumerated()), id: \.offset) { index, item in
                         NavigationLink(value: index) {
                             ItemCard(item: item)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -217,6 +218,11 @@ private struct ItemCard: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 6)
+                    .padding(.top, 6)
             }
 
             // All five micros for the detail row, headlines (P/Fi/Na) emphasized.
