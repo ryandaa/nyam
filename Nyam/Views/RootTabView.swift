@@ -14,7 +14,7 @@ struct RootTabView: View {
     @State private var showCameraFlow = false
 
     enum Tab {
-        case home, summary, profile
+        case home, profile
     }
 
     var body: some View {
@@ -22,7 +22,6 @@ struct RootTabView: View {
             Group {
                 switch selectedTab {
                 case .home:    HomeView()
-                case .summary: SummaryView()
                 case .profile: ProfileView()
                 }
             }
@@ -51,18 +50,11 @@ private struct BottomBar: View {
     var body: some View {
         HStack(spacing: 0) {
             TabBarButton(
-                icon: "newspaper",
-                activeIcon: "newspaper.fill",
+                icon: "house",
+                activeIcon: "house.fill",
                 label: "Home",
                 isActive: selected == .home
             ) { selected = .home }
-
-            TabBarButton(
-                icon: "square.grid.3x3",
-                activeIcon: "square.grid.3x3.fill",
-                label: "Summary",
-                isActive: selected == .summary
-            ) { selected = .summary }
 
             CenterButton(onTap: onCenterTap)
 
