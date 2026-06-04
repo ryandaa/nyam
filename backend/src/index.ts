@@ -1,6 +1,6 @@
 import { verifyAppleIdentityToken } from "./auth";
 import { analyzePlate } from "./openai";
-import { lookupFoods, scaleByGrams } from "./usda";
+import { lookupFoods, scaleByGrams, lookupBarcodeUSDA } from "./usda";
 import { chatWithCoach } from "./chat";
 import { lookupBarcode } from "./off";
 import { analyzeMenu } from "./menu";
@@ -118,15 +118,45 @@ function round(value: number, places: number): number {
   return Math.round(value * m) / m;
 }
 
-async function handleBarcode(url: URL): Promise<Response> {
+async function handleBarcode(url: URL, env: Env): Promise<Response> {
   const parts = url.pathname.split("/");
   const code = parts[parts.length - 1];
   if (!code) {
     return json({ error: "Missing barcode in path" }, 400);
   }
   try {
-    const result = await lookupBarcode(code);
-    return json(result);
+    // 1) Open Food Facts — strongest for European packaged goods.
+    const offResult = await lookupBarcode(code);
+    if (offResult.found) {
+      return json({ ...offResult, source: "open_food_facts" });
+    }
+
+    // 2) Fall back to USDA Branded — strongest for US protein shakes,
+    //    supplements, and other US grocery products that OFF misses.
+    if (env.USDA_API_KEY) {
+      const usdaProduct = await lookupBarcodeUSDA(code, env.USDA_API_KEY);
+      if (usdaProduct) {
+        return json({
+          found: true,
+          barcode: code.replace(/\D/g, ""),
+          product: {
+            name: usdaProduct.name,
+            brand: usdaProduct.brand,
+            image_url: null,
+            serving_size_g: usdaProduct.servingSizeG,
+            nutrition: usdaProduct.nutrition,
+          },
+          source: "usda_branded",
+        });
+      }
+    }
+
+    // 3) Neither database has it. Surface a friendly reason.
+    return json({
+      ...offResult,
+      reason: offResult.reason ?? "Not in Open Food Facts or USDA Branded Foods",
+      source: "none",
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Barcode lookup failed";
     console.error("barcode error:", message);
@@ -244,10 +274,11 @@ export default {
       return handleMenu(request, env, url);
     }
 
-    // Barcode lookups are GET /barcode/<code>. No auth required — Open Food
-    // Facts is public and this is read-only, no GPT spend.
+    // Barcode lookups are GET /barcode/<code>. No auth required — read-only
+    // public data, no GPT spend. Worker tries Open Food Facts first then
+    // falls back to USDA Branded if OFF doesn't have the product.
     if (request.method === "GET" && url.pathname.startsWith("/barcode/")) {
-      return handleBarcode(url);
+      return handleBarcode(url, env);
     }
 
     if (request.method !== "POST" || url.pathname !== "/scan") {

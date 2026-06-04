@@ -23,6 +23,10 @@ struct CameraFlowView: View {
     @State private var barcodeLookup: BarcodeLookupResult?
     @State private var barcodeIsLooking = false
 
+    // Manual-entry fallback (kicked off when barcode lookup misses
+    // and the user chooses to log manually).
+    @State private var showManualEntry = false
+
     private struct AnalyzingFoodScan: Identifiable {
         let id = UUID()
         let image: UIImage
@@ -69,9 +73,18 @@ struct CameraFlowView: View {
                             onLogged: {
                                 barcodeLookup = nil
                                 onFinish()
+                            },
+                            onLogManually: {
+                                barcodeLookup = nil
+                                showManualEntry = true
                             }
                         )
                         .environmentObject(history)
+                    }
+                    .sheet(isPresented: $showManualEntry) {
+                        ManualEntryView()
+                            .environmentObject(history)
+                            .onDisappear { onFinish() }
                     }
                     .overlay {
                         if analyzing != nil || menuIsAnalyzing || barcodeIsLooking {

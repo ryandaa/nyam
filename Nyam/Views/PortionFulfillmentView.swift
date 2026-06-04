@@ -10,6 +10,9 @@ struct PortionFulfillmentView: View {
 
     let lookup: BarcodeLookupResult
     let onLogged: () -> Void
+    /// Called when the user taps "Log it manually" on the not-found state.
+    /// CameraFlowView dismisses this sheet and presents ManualEntryView next.
+    let onLogManually: () -> Void
 
     @State private var servings: Double = 1.0
 
@@ -74,7 +77,7 @@ struct PortionFulfillmentView: View {
 
     private var notFoundBody: some View {
         VStack(spacing: 18) {
-            Spacer(minLength: 60)
+            Spacer(minLength: 40)
             ZStack {
                 Circle()
                     .fill(Color.NyamSage.shade5.opacity(0.12))
@@ -86,13 +89,28 @@ struct PortionFulfillmentView: View {
             VStack(spacing: 8) {
                 Text("Couldn't find that product")
                     .font(.title3.weight(.semibold))
-                Text(lookup.reason ?? "Open Food Facts doesn't have an entry for barcode \(lookup.barcode). Try logging it manually.")
-                    .font(.body)
+                Text("Barcode #\(lookup.barcode) isn't in Open Food Facts or USDA. US protein shakes and supplements have spotty coverage — manufacturers have to submit their data to these databases and not all do.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
             Spacer()
+            Button {
+                onLogManually()
+            } label: {
+                HStack {
+                    Image(systemName: "pencil")
+                    Text("Log it manually")
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.NyamSage.shade5, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
     }
 
@@ -247,7 +265,8 @@ private struct StatCell: View {
             ),
             reason: nil
         ),
-        onLogged: {}
+        onLogged: {},
+        onLogManually: {}
     )
     .environmentObject(ScanHistory())
 }
@@ -255,7 +274,8 @@ private struct StatCell: View {
 #Preview("Not found") {
     PortionFulfillmentView(
         lookup: BarcodeLookupResult(found: false, barcode: "0000", product: nil, reason: "Product not in Open Food Facts"),
-        onLogged: {}
+        onLogged: {},
+        onLogManually: {}
     )
     .environmentObject(ScanHistory())
 }
