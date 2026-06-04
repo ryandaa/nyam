@@ -30,10 +30,12 @@ Same class of model (frontier vision LLM), three additional grounding layers on 
 |---|---|---|
 | **Vision model** | OpenAI + Anthropic frontier LLMs (per TechCrunch, Mar 2025) | OpenAI GPT-4o |
 | **Scale recovery** | None — no reference, no depth, no LiDAR ([CNBC, Sept 2025](https://www.cnbc.com/2025/09/06/cal-ai-how-a-teenage-ceo-built-a-fast-growing-calorie-tracking-app.html)) | ARKit horizontal-plane detection + camera-intrinsic raycasting — plate diameter derived from camera physics |
+| **Volume measurement** | None — single 2D photo only (founder, CNBC: "we don't have X-ray vision") | **LiDAR depth scan** on iPhone Pro — per-pixel depth map integrated to a real food volume in cm³ above the plate plane |
 | **Output format** | Not publicly disclosed | Strict JSON schema — model can't return free-text or skip fields |
-| **Forced dimensions** | None | Per-item `width_cm × depth_cm × height_cm` are required schema fields, computed *before* grams |
-| **Nutrition reference** | "Open-source food calorie and image databases from GitHub" (per TechCrunch, Mar 2025) | Per-category density (g/cm³) and per-100g sodium/fiber anchors baked into the system prompt |
+| **Forced dimensions** | None | Per-item `width_cm × depth_cm × height_cm` are required schema fields, computed *before* grams. On LiDAR, the measured total volume is given to the model as a hard constraint |
+| **Nutrition reference** | "Open-source food calorie and image databases from GitHub" (per TechCrunch, Mar 2025) | **USDA FoodData Central API** — per-item lookup, scaled by the model's grams. Falls back to density/sodium/fiber prompt anchors when USDA has no match. Each item shows USDA vs AI-estimate provenance in the UI |
 | **Reasoning chain** | Not disclosed | Explicit 9-step CoT in the system prompt: identify → area% → cm² → dimensions → height → volume → grams → macros → sanity check |
+| **Graceful degradation** | n/a — one path | Three tiers: **LiDAR** (Pro) → real volume; **AR** (non-Pro) → plate-anchored; **Manual** (library photo / no AR) → user confirms plate size. Active tier surfaced in the UI |
 | **Accuracy claim** | "~90%" (founder), [unvalidated by TechCrunch](https://techcrunch.com/2025/03/16/photo-calorie-app-cal-ai-downloaded-over-a-million-times-was-built-by-two-teenagers/) | See [Evaluation](#evaluation) section — reproducible eval set in `eval/images/` |
 
 ## Architecture
@@ -63,6 +65,7 @@ iPhone (SwiftUI)
 - **Node 20+** and **npm**
 - **Cloudflare account** (free tier is plenty) + `wrangler` CLI (`npm i -g wrangler`)
 - **OpenAI API key** with `gpt-4o` access
+- **USDA FoodData Central API key** (free, instant) — sign up at [api.data.gov/signup](https://api.data.gov/signup/). Optional — Nyam works without it; you just lose per-item USDA grounding
 - **Apple Developer account** (free tier works for personal-device testing) — paid tier only required if you swap the V1 stub auth back to real Sign in with Apple
 - An **iPhone** for testing (Pro recommended; LiDAR is a planned future feature)
 
@@ -83,6 +86,7 @@ For production deploy:
 
 ```bash
 npx wrangler secret put OPENAI_API_KEY   # paste your key
+npx wrangler secret put USDA_API_KEY     # paste your USDA key (optional but recommended)
 npx wrangler deploy
 ```
 
@@ -111,9 +115,12 @@ In Xcode:
    - `ARFrame.raycastQuery` shoots a ray from the plate's screen-space center onto the detected horizontal plane to get the real distance from camera to plate in meters.
    - Pinhole projection (`real_diameter = pixel_diameter × distance / focal_length_px`) using the focal length from `ARFrame.camera.intrinsics` gives the plate's real-world diameter in cm.
 4. **POST `/scan`** — image + measured plate diameter sent to the Worker. If AR couldn't lock on (no plane, bad lighting), the V2 manual-calibration sheet asks the user to enter the plate size instead.
-5. **Worker** — verifies the Apple JWT (or skips it via `?dev=1`), then calls OpenAI GPT-4o with a vision message and `response_format: { type: "json_schema", json_schema: SCAN_SCHEMA }`. The schema forces per-item `width_cm × depth_cm × height_cm` plus all macros (cal/P/C/F/Fi/Na) plus a short title — no free-text parsing.
-6. **Results view** — model-generated title at the top, per-item cards (name, grams, plate area %, all macros) and a totals card highlighting Calories · Protein · Fiber · Sodium.
-7. **History** — entry persisted to UserDefaults with the captured JPEG saved to `Documents/scans/`. Home feed shows a Strava-style card with the hero image + four stat chips.
+5. **(LiDAR-only)** On Pro iPhones, `ARFrame.sceneDepth` is also captured. Every depth-map pixel within the plate's world disk gets backprojected to a 3D position; pixels above the plate plane are summed as `height × pixel_area` for the total food volume in cm³. That measured volume is shipped to the Worker alongside the image and the plate diameter.
+6. **POST `/scan`** — image + measured plate diameter (+ measured food volume on LiDAR) sent to the Worker. If AR couldn't lock on, the V2 manual-calibration sheet asks for the plate size instead.
+7. **Worker** — verifies the Apple JWT (or skips it via `?dev=1`), then calls OpenAI GPT-4o with `response_format: { type: "json_schema", json_schema: SCAN_SCHEMA }`. The schema forces per-item dimensions + macros + a short title. When LiDAR volume was supplied, the user-message also tells the model the measured total cm³ to constrain its estimates.
+8. **USDA enrichment** — for each item the model identified, the Worker queries [FoodData Central](https://fdc.nal.usda.gov/) and replaces the model's macros with USDA's per-100g values scaled by the grams estimate. Items without a USDA match keep the model's numbers. Per-item provenance (`nutrition_source: "usda" | "model"`) is returned to iOS.
+9. **Results view** — model-generated title at top, per-item cards with USDA/AI-estimate badges, totals card highlighting Calories · Protein · Fiber · Sodium.
+10. **History** — entry persisted to UserDefaults with the captured JPEG saved to `Documents/scans/`. Home feed shows a Strava-style card with the hero image + four stat chips.
 
 ## Evaluation
 
