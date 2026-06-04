@@ -73,8 +73,11 @@ private struct EmptyHomeState: View {
 private struct MealCard: View {
     let entry: HistoryEntry
 
-    private var topItemName: String {
-        entry.result.items.max(by: { $0.calories < $1.calories })?.name.capitalized ?? "Empty plate"
+    /// Title from the model when available; falls back to the top-calorie
+    /// food name for pre-title v2 history entries.
+    private var displayTitle: String {
+        if let title = entry.result.title, !title.isEmpty { return title }
+        return entry.result.items.max(by: { $0.calories < $1.calories })?.name.capitalized ?? "Empty Plate"
     }
 
     var body: some View {
@@ -83,7 +86,7 @@ private struct MealCard: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(topItemName)
+                    Text(displayTitle)
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)

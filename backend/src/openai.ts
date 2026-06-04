@@ -53,6 +53,7 @@ RULES
 - When food is layered or partially hidden, lower your estimate rather than guess high.
 - Round grams to the nearest 5 g; round calories to the nearest 5 kcal; round macros to one decimal; round sodium to the nearest 5 mg; round dimensions to one decimal cm.
 - Item names: lowercase common English, no brand names unless they are unmistakable (e.g. "grilled chicken thigh", "white jasmine rice", "steamed broccoli", "fried egg").
+- title: short meal name in 5 WORDS OR FEWER, Title-Cased. Catchy, restaurant-menu style — describe the dish, not the ingredients list. Good: "Sesame Chicken & Rice Bowl", "Greek Salad with Salmon", "Pancakes with Berries", "Steak Frites". Bad: "Grilled chicken, jasmine rice and broccoli" (too long, comma-listy). If the plate is empty or no plate is visible, use "Empty Plate".
 - Return JSON exactly matching the supplied schema. No prose, no markdown, no trailing text.`;
 
 interface OpenAIChatResponse {

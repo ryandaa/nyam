@@ -34,6 +34,7 @@ export interface ScanTotals {
 
 export interface ScanResult {
   plate_detected: boolean;
+  title: string;
   items: ScanItem[];
   totals: ScanTotals;
 }

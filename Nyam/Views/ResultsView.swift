@@ -7,10 +7,15 @@ struct ResultsView: View {
     /// nav-stack back button handles dismissal).
     let onScanAgain: (() -> Void)?
 
+    private var navTitle: String {
+        if let t = result.title, !t.isEmpty { return t }
+        return "Your plate"
+    }
+
     var body: some View {
         content
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Your plate")
+            .navigationTitle(navTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if let onScanAgain {

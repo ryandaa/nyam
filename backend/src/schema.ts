@@ -15,6 +15,10 @@ export const SCAN_SCHEMA = {
         type: "boolean",
         description: "True if a plate is visible in the photo.",
       },
+      title: {
+        type: "string",
+        description: "Short title for the meal, strictly 5 words or fewer, title-cased. Examples: 'Sesame Chicken & Rice Bowl', 'Greek Salad with Salmon', 'Pancakes with Berries'. Use 'Empty Plate' if no food.",
+      },
       items: {
         type: "array",
         description: "One entry per distinct food item on the plate.",
@@ -80,6 +84,6 @@ export const SCAN_SCHEMA = {
         required: ["calories", "protein_g", "carbs_g", "fat_g", "fiber_g", "sodium_mg"],
       },
     },
-    required: ["plate_detected", "items", "totals"],
+    required: ["plate_detected", "title", "items", "totals"],
   },
 } as const;

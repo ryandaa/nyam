@@ -4,11 +4,16 @@ import Foundation
 /// JSON Schema in `backend/src/schema.ts`. Keep all three in sync.
 struct ScanResult: Codable, Equatable {
     let plateDetected: Bool
+    /// Catchy short meal title produced by the vision model (≤5 words,
+    /// title-cased). Optional on the iOS side so older v2 history entries
+    /// (which predate this field) still decode.
+    let title: String?
     let items: [ScanItem]
     let totals: ScanTotals
 
     enum CodingKeys: String, CodingKey {
         case plateDetected = "plate_detected"
+        case title
         case items
         case totals
     }
@@ -67,6 +72,7 @@ extension ScanResult {
     /// Mock data for SwiftUI previews and offline testing.
     static let preview = ScanResult(
         plateDetected: true,
+        title: "Grilled Chicken & Veggies",
         items: [
             ScanItem(
                 name: "Grilled chicken thigh",
