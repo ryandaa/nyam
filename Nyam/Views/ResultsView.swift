@@ -196,6 +196,17 @@ private struct NutritionSourceBadge: View {
             .padding(.vertical, 3)
             .background(Color.accentColor.opacity(0.12), in: Capsule())
             .help(item.usdaDescription ?? "Nutrition from USDA FoodData Central")
+        case .openFoodFacts:
+            HStack(spacing: 4) {
+                Image(systemName: "barcode")
+                    .font(.caption2)
+                Text("Open Food Facts")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(Color.accentColor)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Color.accentColor.opacity(0.12), in: Capsule())
         case .manual:
             HStack(spacing: 4) {
                 Image(systemName: "pencil")

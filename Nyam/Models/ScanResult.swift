@@ -26,6 +26,8 @@ enum NutritionSource: String, Codable, Equatable {
     case model
     /// User entered the macros by hand via ManualEntryView.
     case manual
+    /// Looked up in Open Food Facts by UPC/EAN barcode.
+    case openFoodFacts = "open_food_facts"
 }
 
 struct ScanItem: Codable, Equatable, Identifiable {

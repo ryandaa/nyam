@@ -94,6 +94,72 @@ enum NyamAPI {
         }
     }
 
+    // MARK: - V5.1: Menu scanning
+
+    static func scanMenu(image: UIImage, identityToken: String?) async throws -> MenuResult {
+        let downscaled = downscaled(image, maxDimension: maxUploadDimension)
+        guard let jpeg = downscaled.jpegData(compressionQuality: 0.6) else {
+            throw APIError.badImage
+        }
+        let base64 = jpeg.base64EncodedString()
+
+        var url = baseURL.appendingPathComponent("menu")
+        if appendDevFlag {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            components?.queryItems = [URLQueryItem(name: "dev", value: "1")]
+            if let resolved = components?.url { url = resolved }
+        }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = identityToken {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        req.timeoutInterval = 120
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["image_base64": base64])
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.decode("Non-HTTP response")
+        }
+        if http.statusCode != 200 {
+            let msg = String(data: data, encoding: .utf8) ?? "<binary>"
+            throw APIError.http(http.statusCode, msg)
+        }
+        do {
+            return try JSONDecoder().decode(MenuResult.self, from: data)
+        } catch {
+            throw APIError.decode(error.localizedDescription)
+        }
+    }
+
+    // MARK: - V5.1: Barcode lookup
+
+    static func lookupBarcode(_ code: String) async throws -> BarcodeLookupResult {
+        let cleanCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let url = baseURL.appendingPathComponent("barcode").appendingPathComponent(cleanCode)
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 20
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.decode("Non-HTTP response")
+        }
+        if http.statusCode != 200 {
+            let msg = String(data: data, encoding: .utf8) ?? "<binary>"
+            throw APIError.http(http.statusCode, msg)
+        }
+        do {
+            return try JSONDecoder().decode(BarcodeLookupResult.self, from: data)
+        } catch {
+            throw APIError.decode(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Helpers
+
     /// Aspect-preserving downscale so the longest edge is `maxDimension`.
     /// Returns the original image if it's already small enough.
     private static func downscaled(_ image: UIImage, maxDimension: CGFloat) -> UIImage {

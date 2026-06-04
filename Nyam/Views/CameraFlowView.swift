@@ -1,26 +1,30 @@
 import SwiftUI
 
 /// Full-screen modal flow opened by the bottom-bar "+" button.
-/// Owns the state machine: Scan → (auto-measure or calibrate) → Results → Done.
-///
-/// If ARKit returns a measured plate diameter, we skip the CalibrationSheet
-/// and run the scan immediately — the V3 magic moment. If measurement fails
-/// (no plane found, raycast miss), we fall back to V2's manual CalibrationSheet
-/// so the demo never dead-ends.
+/// Hosts the three capture modes:
+///   - Food   → ARKit scan → /scan → ResultsView
+///   - Menu   → photo capture → /menu → MenuResultsView
+///   - QR     → barcode detection → /barcode/<code> → PortionFulfillmentView
 struct CameraFlowView: View {
     @EnvironmentObject var auth: AuthManager
     @EnvironmentObject var history: ScanHistory
     let onFinish: () -> Void
 
     @State private var pendingCalibration: CapturedPhoto?
-    @State private var analyzing: AnalyzingScan?
+    @State private var analyzing: AnalyzingFoodScan?
     @State private var result: ScanResult?
     @State private var errorMessage: String?
 
-    /// Captured frame for which ARKit returned a confident diameter — we go
-    /// straight to /scan, no manual sheet. `foodVolumeCm3` is present only
-    /// on LiDAR-capable Pro phones.
-    private struct AnalyzingScan: Identifiable {
+    // Menu-mode state
+    @State private var menuCaptured: CapturedPhoto?
+    @State private var menuResult: MenuResult?
+    @State private var menuIsAnalyzing = false
+
+    // Barcode-mode state
+    @State private var barcodeLookup: BarcodeLookupResult?
+    @State private var barcodeIsLooking = false
+
+    private struct AnalyzingFoodScan: Identifiable {
         let id = UUID()
         let image: UIImage
         let diameterCm: Double
@@ -46,7 +50,7 @@ struct CameraFlowView: View {
                     }
                 }
             } else {
-                ScanView(onCapture: handleCapture(measurement:))
+                ScanView(onCapture: handleCapture(_:))
                     .sheet(item: $pendingCalibration) { photo in
                         CalibrationSheet(
                             image: photo.image,
@@ -59,8 +63,30 @@ struct CameraFlowView: View {
                         )
                         .interactiveDismissDisabled()
                     }
+                    .fullScreenCover(item: $menuResult) { menu in
+                        MenuResultsView(
+                            menu: menu,
+                            menuImage: menuCaptured?.image,
+                            onFinish: {
+                                menuResult = nil
+                                menuCaptured = nil
+                                onFinish()
+                            }
+                        )
+                        .environmentObject(history)
+                    }
+                    .sheet(item: $barcodeLookup) { lookup in
+                        PortionFulfillmentView(
+                            lookup: lookup,
+                            onLogged: {
+                                barcodeLookup = nil
+                                onFinish()
+                            }
+                        )
+                        .environmentObject(history)
+                    }
                     .overlay {
-                        if analyzing != nil {
+                        if analyzing != nil || menuIsAnalyzing || barcodeIsLooking {
                             LoadingView()
                                 .transition(.opacity)
                         }
@@ -75,11 +101,26 @@ struct CameraFlowView: View {
         }
         .animation(.easeInOut(duration: 0.22), value: result != nil)
         .animation(.easeInOut(duration: 0.18), value: analyzing != nil)
+        .animation(.easeInOut(duration: 0.18), value: menuIsAnalyzing)
+        .animation(.easeInOut(duration: 0.18), value: barcodeIsLooking)
     }
 
-    private func handleCapture(measurement: ARMeasurement) {
+    // MARK: - Capture dispatch
+
+    private func handleCapture(_ result: CaptureResult) {
+        switch result {
+        case .food(let measurement):
+            handleFoodCapture(measurement)
+        case .menu(let image):
+            handleMenuCapture(image)
+        case .barcode(let code):
+            handleBarcodeCapture(code)
+        }
+    }
+
+    private func handleFoodCapture(_ measurement: ARMeasurement) {
         if let diameterCm = measurement.diameterCm {
-            let scan = AnalyzingScan(
+            let scan = AnalyzingFoodScan(
                 image: measurement.image,
                 diameterCm: diameterCm,
                 foodVolumeCm3: measurement.foodVolumeCm3
@@ -87,13 +128,25 @@ struct CameraFlowView: View {
             analyzing = scan
             Task { await runDirectScan(scan) }
         } else {
-            // ARKit couldn't measure — fall back to manual calibration sheet.
             pendingCalibration = CapturedPhoto(image: measurement.image)
         }
     }
 
+    private func handleMenuCapture(_ image: UIImage) {
+        menuCaptured = CapturedPhoto(image: image)
+        menuIsAnalyzing = true
+        Task { await runMenuScan(image: image) }
+    }
+
+    private func handleBarcodeCapture(_ code: String) {
+        barcodeIsLooking = true
+        Task { await runBarcodeLookup(code: code) }
+    }
+
+    // MARK: - Network calls
+
     @MainActor
-    private func runDirectScan(_ scan: AnalyzingScan) async {
+    private func runDirectScan(_ scan: AnalyzingFoodScan) async {
         do {
             let newResult = try await NyamAPI.scan(
                 image: scan.image,
@@ -109,6 +162,43 @@ struct CameraFlowView: View {
             analyzing = nil
         }
     }
+
+    @MainActor
+    private func runMenuScan(image: UIImage) async {
+        do {
+            let menu = try await NyamAPI.scanMenu(image: image, identityToken: auth.identityToken)
+            menuIsAnalyzing = false
+            menuResult = menu
+        } catch {
+            errorMessage = error.localizedDescription
+            menuIsAnalyzing = false
+            menuCaptured = nil
+        }
+    }
+
+    @MainActor
+    private func runBarcodeLookup(code: String) async {
+        do {
+            let lookup = try await NyamAPI.lookupBarcode(code)
+            barcodeIsLooking = false
+            barcodeLookup = lookup
+        } catch {
+            errorMessage = error.localizedDescription
+            barcodeIsLooking = false
+        }
+    }
+}
+
+// MARK: - Identifiable conformance for the menu cover
+
+extension MenuResult: Identifiable {
+    public var id: String {
+        (restaurantName ?? "menu") + "-" + dishes.map(\.name).joined(separator: ",")
+    }
+}
+
+extension BarcodeLookupResult: Identifiable {
+    public var id: String { barcode }
 }
 
 // MARK: - Error toast

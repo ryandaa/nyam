@@ -3,9 +3,9 @@ import ARKit
 import RealityKit
 import PhotosUI
 
-/// Active capture mode in `ScanView`. Wave 1 fully implements `.food`; the
-/// other two show "coming in v5.1" stub sheets when the user tries to act on
-/// them, but the picker UI is present so the demo shows all three modes.
+/// Active capture mode in `ScanView`. All three are fully wired as of V5.1:
+/// .food → ARKit plate scan, .qr → AVCaptureMetadataOutput barcode read,
+/// .menu → vision LLM on a menu photo.
 enum CaptureMode: String, CaseIterable, Identifiable {
     case food, qr, menu
 
@@ -28,6 +28,14 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// What ScanView hands back to its parent on a successful capture. The
+/// parent (`CameraFlowView`) dispatches by case.
+enum CaptureResult {
+    case food(ARMeasurement)
+    case menu(UIImage)
+    case barcode(String)
+}
+
 /// ARKit-backed scan view. Hosts a `RealityKit` `ARView` showing the live
 /// camera, watches for horizontal-plane detection, and on capture hands back
 /// the image + (optionally) the measured plate diameter in cm.
@@ -40,26 +48,25 @@ struct ScanView: View {
     @StateObject private var arScan = ARScanSession()
     @State private var libraryPickerItem: PhotosPickerItem?
     @State private var mode: CaptureMode = .food
-    @State private var showComingSoonSheet = false
-    let onCapture: (ARMeasurement) -> Void
+    let onCapture: (CaptureResult) -> Void
 
     var body: some View {
         ZStack {
-            ARCameraView(session: arScan.session)
+            // Camera layer varies by mode.
+            switch mode {
+            case .food, .menu:
+                ARCameraView(session: arScan.session)
+                    .ignoresSafeArea()
+            case .qr:
+                BarcodeScannerView { code in
+                    onCapture(.barcode(code))
+                }
                 .ignoresSafeArea()
+            }
 
             // Reticle / framing guide
-            VStack {
-                Spacer()
-                Image(systemName: "circle.dashed")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 260, height: 260)
-                    .foregroundStyle(.white.opacity(0.7))
-                    .shadow(radius: 4)
-                Spacer()
-            }
-            .allowsHitTesting(false)
+            reticle
+                .allowsHitTesting(false)
 
             VStack {
                 HStack {
@@ -75,9 +82,11 @@ struct ScanView: View {
 
                     Spacer()
 
-                    tierBadge
-                        .padding(.trailing, 20)
-                        .padding(.top, 12)
+                    if mode == .food {
+                        tierBadge
+                            .padding(.trailing, 20)
+                            .padding(.top, 12)
+                    }
                 }
 
                 modePicker
@@ -101,11 +110,15 @@ struct ScanView: View {
                     .accessibilityLabel("Choose from Library")
 
                     Button {
-                        if mode == .food {
+                        switch mode {
+                        case .food:
                             let result = arScan.captureScan()
-                            onCapture(result)
-                        } else {
-                            showComingSoonSheet = true
+                            onCapture(.food(result))
+                        case .menu:
+                            let result = arScan.captureScan()
+                            onCapture(.menu(result.image))
+                        case .qr:
+                            break    // QR is auto-detected; shutter is a no-op
                         }
                     } label: {
                         ZStack {
@@ -125,16 +138,50 @@ struct ScanView: View {
                 .padding(.bottom, 36)
             }
         }
-        .onAppear { arScan.start() }
+        .onAppear {
+            if mode != .qr { arScan.start() }
+        }
         .onDisappear { arScan.stop() }
+        .onChange(of: mode) { _, newMode in
+            // Pause AR while in barcode mode so two camera sessions don't fight.
+            if newMode == .qr {
+                arScan.stop()
+            } else {
+                arScan.start()
+            }
+        }
         .onChange(of: libraryPickerItem) { _, newItem in
             guard let newItem else { return }
             Task { await loadLibraryPhoto(newItem) }
         }
-        .sheet(isPresented: $showComingSoonSheet) {
-            ComingSoonSheet(mode: mode)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private var reticle: some View {
+        VStack {
+            Spacer()
+            switch mode {
+            case .food:
+                Image(systemName: "circle.dashed")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 260, height: 260)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .shadow(radius: 4)
+            case .menu:
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [10, 6]))
+                    .frame(width: 280, height: 360)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .shadow(radius: 4)
+            case .qr:
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [12, 8]))
+                    .frame(width: 240, height: 240)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .shadow(radius: 4)
+            }
+            Spacer()
         }
     }
 
@@ -206,15 +253,22 @@ struct ScanView: View {
     @ViewBuilder
     private var statusBanner: some View {
         let (text, icon): (String, String) = {
-            switch arScan.state {
-            case .starting:
-                return ("Starting camera…", "viewfinder")
-            case .lookingForPlane:
-                return ("Move your phone over the table to lock scale", "arrow.up.and.down.and.arrow.left.and.right")
-            case .ready:
-                return ("Center your plate, then capture", "checkmark.circle.fill")
-            case .unsupported:
-                return ("AR not supported on this device — using assumed plate size", "exclamationmark.triangle.fill")
+            switch mode {
+            case .menu:
+                return ("Frame the whole menu in view", "doc.text.viewfinder")
+            case .qr:
+                return ("Point at a barcode", "barcode.viewfinder")
+            case .food:
+                switch arScan.state {
+                case .starting:
+                    return ("Starting camera…", "viewfinder")
+                case .lookingForPlane:
+                    return ("Move your phone over the table to lock scale", "arrow.up.and.down.and.arrow.left.and.right")
+                case .ready:
+                    return ("Center your plate, then capture", "checkmark.circle.fill")
+                case .unsupported:
+                    return ("AR not supported on this device — using assumed plate size", "exclamationmark.triangle.fill")
+                }
             }
         }()
 
@@ -228,68 +282,6 @@ struct ScanView: View {
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .padding(.bottom, 18)
-    }
-}
-
-// MARK: - "Coming soon" sheet for Wave 2 modes
-
-private struct ComingSoonSheet: View {
-    let mode: CaptureMode
-    @Environment(\.dismiss) private var dismiss
-
-    private var copy: (title: String, body: String) {
-        switch mode {
-        case .qr:
-            return (
-                "Barcode scanning is coming soon",
-                "Point at a UPC barcode on packaged food. We'll pull verified nutrition from Open Food Facts, then ask you how many servings you ate."
-            )
-        case .menu:
-            return (
-                "Menu scanning is coming soon",
-                "Snap a restaurant menu. We'll identify each dish and estimate calories + macros per serving so you can decide before you order."
-            )
-        case .food:
-            return ("", "")  // not used
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 18) {
-            ZStack {
-                Circle()
-                    .fill(Color.NyamSage.shade5.opacity(0.12))
-                    .frame(width: 84, height: 84)
-                Image(systemName: mode.icon)
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundStyle(Color.NyamSage.shade5)
-            }
-            VStack(spacing: 8) {
-                Text(copy.title)
-                    .font(.title3.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                Text(copy.body)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
-            Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Text("Got it")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.NyamSage.shade5, in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(.white)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-        }
-        .padding(.top, 40)
-        .background(Color.NyamSurface.background.ignoresSafeArea())
     }
 }
 
