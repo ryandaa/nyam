@@ -268,7 +268,7 @@ struct ScanView: View {
                 case .ready:
                     return ("Center your plate, then capture", "checkmark.circle.fill")
                 case .unsupported:
-                    return ("AR not supported on this device — using assumed plate size", "exclamationmark.triangle.fill")
+                    return ("AR not supported — Nyam will estimate from the image alone", "exclamationmark.triangle.fill")
                 }
             }
         }()

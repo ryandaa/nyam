@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Full-screen modal flow opened by the bottom-bar "+" button.
 /// Hosts the three capture modes:
-///   - Food   → ARKit scan → /scan → ResultsView
+///   - Food   → ARKit scan (live or library) → /scan → ResultsView
 ///   - Menu   → photo capture → /menu → MenuResultsView
 ///   - QR     → barcode detection → /barcode/<code> → PortionFulfillmentView
 struct CameraFlowView: View {
@@ -10,7 +10,6 @@ struct CameraFlowView: View {
     @EnvironmentObject var history: ScanHistory
     let onFinish: () -> Void
 
-    @State private var pendingCalibration: CapturedPhoto?
     @State private var analyzing: AnalyzingFoodScan?
     @State private var result: ScanResult?
     @State private var errorMessage: String?
@@ -27,7 +26,9 @@ struct CameraFlowView: View {
     private struct AnalyzingFoodScan: Identifiable {
         let id = UUID()
         let image: UIImage
-        let diameterCm: Double
+        /// Optional — ARKit-measured when present, nil for library photos
+        /// or when AR couldn't lock on. The Worker handles both cases.
+        let diameterCm: Double?
         let foodVolumeCm3: Double?
     }
 
@@ -39,7 +40,6 @@ struct CameraFlowView: View {
                         result: result,
                         onScanAgain: {
                             self.result = nil
-                            self.pendingCalibration = nil
                             self.analyzing = nil
                         }
                     )
@@ -51,18 +51,6 @@ struct CameraFlowView: View {
                 }
             } else {
                 ScanView(onCapture: handleCapture(_:))
-                    .sheet(item: $pendingCalibration) { photo in
-                        CalibrationSheet(
-                            image: photo.image,
-                            onScanComplete: { newResult in
-                                history.record(newResult, image: photo.image)
-                                pendingCalibration = nil
-                                result = newResult
-                            },
-                            onCancel: { pendingCalibration = nil }
-                        )
-                        .interactiveDismissDisabled()
-                    }
                     .fullScreenCover(item: $menuResult) { menu in
                         MenuResultsView(
                             menu: menu,
@@ -119,17 +107,16 @@ struct CameraFlowView: View {
     }
 
     private func handleFoodCapture(_ measurement: ARMeasurement) {
-        if let diameterCm = measurement.diameterCm {
-            let scan = AnalyzingFoodScan(
-                image: measurement.image,
-                diameterCm: diameterCm,
-                foodVolumeCm3: measurement.foodVolumeCm3
-            )
-            analyzing = scan
-            Task { await runDirectScan(scan) }
-        } else {
-            pendingCalibration = CapturedPhoto(image: measurement.image)
-        }
+        // Always go straight to /scan — Worker handles both anchored
+        // (ARKit measured a plate diameter) and unanchored (library photo,
+        // or AR couldn't lock) cases. No CalibrationSheet step in V5.2.
+        let scan = AnalyzingFoodScan(
+            image: measurement.image,
+            diameterCm: measurement.diameterCm,
+            foodVolumeCm3: measurement.foodVolumeCm3
+        )
+        analyzing = scan
+        Task { await runScan(scan) }
     }
 
     private func handleMenuCapture(_ image: UIImage) {
@@ -146,7 +133,7 @@ struct CameraFlowView: View {
     // MARK: - Network calls
 
     @MainActor
-    private func runDirectScan(_ scan: AnalyzingFoodScan) async {
+    private func runScan(_ scan: AnalyzingFoodScan) async {
         do {
             let newResult = try await NyamAPI.scan(
                 image: scan.image,

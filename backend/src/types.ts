@@ -8,9 +8,13 @@ export interface Env {
 
 export interface ScanRequest {
   image_base64: string;
-  plate_diameter_cm: number;
+  /// Optional: when present (ARKit measured the plate live), the prompt
+  /// anchors every gram estimate to this real-world plate area. When
+  /// absent (library photo, AR couldn't lock), the model falls back to
+  /// unanchored portion estimation from context clues.
+  plate_diameter_cm?: number;
   /// Optional: real food volume measured via LiDAR depth (Pro iPhones only).
-  /// When present, the prompt uses it as a strong portion constraint.
+  /// Only meaningful when plate_diameter_cm is also present.
   food_volume_cm3?: number;
 }
 

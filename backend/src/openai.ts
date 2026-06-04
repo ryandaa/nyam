@@ -65,27 +65,43 @@ interface OpenAIChatResponse {
 
 export async function analyzePlate(
   imageBase64: string,
-  plateDiameterCm: number,
+  plateDiameterCm: number | undefined,
   apiKey: string,
   foodVolumeCm3?: number,
 ): Promise<ScanResult> {
-  const plateAreaCm2 = Math.PI * Math.pow(plateDiameterCm / 2, 2);
-  const lines: string[] = [
-    `Plate diameter: ${plateDiameterCm.toFixed(1)} cm ` +
-      `(plate area ≈ ${plateAreaCm2.toFixed(0)} cm²).`,
-  ];
-  if (foodVolumeCm3 && foodVolumeCm3 > 0) {
+  const lines: string[] = [];
+
+  if (plateDiameterCm && plateDiameterCm > 0) {
+    const plateAreaCm2 = Math.PI * Math.pow(plateDiameterCm / 2, 2);
     lines.push(
-      `MEASURED TOTAL FOOD VOLUME (from LiDAR depth scan): ${foodVolumeCm3.toFixed(0)} cm³. ` +
-        `This is the actual cubic-centimeter sum of everything above the plate plane, measured by the iPhone's depth sensor — NOT an estimate. ` +
-        `Treat this as a strong constraint: the sum of your per-item (width × depth × height) cm³ values, weighted by typical curvature, should be within ±15% of this measured total. ` +
-        `Adjust per-item heights to fit the measured total before computing grams.`,
+      `Plate diameter: ${plateDiameterCm.toFixed(1)} cm ` +
+        `(plate area ≈ ${plateAreaCm2.toFixed(0)} cm²).`,
+    );
+    if (foodVolumeCm3 && foodVolumeCm3 > 0) {
+      lines.push(
+        `MEASURED TOTAL FOOD VOLUME (from LiDAR depth scan): ${foodVolumeCm3.toFixed(0)} cm³. ` +
+          `This is the actual cubic-centimeter sum of everything above the plate plane, measured by the iPhone's depth sensor — NOT an estimate. ` +
+          `Treat this as a strong constraint: the sum of your per-item (width × depth × height) cm³ values, weighted by typical curvature, should be within ±15% of this measured total. ` +
+          `Adjust per-item heights to fit the measured total before computing grams.`,
+      );
+    }
+    lines.push(
+      `Identify every visible food item and return the structured nutrition result. ` +
+        `Anchor every gram estimate to this plate area.`,
+    );
+  } else {
+    // Unanchored mode — library photo or AR couldn't measure. The model
+    // estimates portion sizes from context clues only. Less precise but
+    // still gives the user a usable result.
+    lines.push(
+      `NO PLATE-SIZE MEASUREMENT IS AVAILABLE for this image (uploaded from the user's photo library or the AR session couldn't lock on). ` +
+        `Estimate portion sizes from context clues only: typical dish sizes for the cuisine, utensils for scale, food category portion norms. ` +
+        `When in doubt, assume a standard 26 cm / 10-inch US dinner plate as the implicit reference, but lower confidence vs an anchored scan. ` +
+        `Still output the same width_cm × depth_cm × height_cm fields per item — use your best estimate. ` +
+        `Identify every visible food item and return the structured nutrition result.`,
     );
   }
-  lines.push(
-    `Identify every visible food item and return the structured nutrition result. ` +
-      `Anchor every gram estimate to this plate area.`,
-  );
+
   const userText = lines.join(" ");
 
   const body = {

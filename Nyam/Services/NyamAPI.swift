@@ -41,7 +41,7 @@ enum NyamAPI {
 
     static func scan(
         image: UIImage,
-        plateDiameterCm: Double,
+        plateDiameterCm: Double?,
         foodVolumeCm3: Double? = nil,
         identityToken: String?
     ) async throws -> ScanResult {
@@ -70,8 +70,10 @@ enum NyamAPI {
 
         var body: [String: Any] = [
             "image_base64": base64,
-            "plate_diameter_cm": plateDiameterCm,
         ]
+        if let plateDiameterCm {
+            body["plate_diameter_cm"] = plateDiameterCm
+        }
         if let foodVolumeCm3 {
             body["food_volume_cm3"] = foodVolumeCm3
         }

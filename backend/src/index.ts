@@ -282,8 +282,11 @@ export default {
     if (!body.image_base64 || typeof body.image_base64 !== "string") {
       return json({ error: "image_base64 (string) required" }, 400);
     }
-    if (typeof body.plate_diameter_cm !== "number" || body.plate_diameter_cm <= 0) {
-      return json({ error: "plate_diameter_cm (positive number) required" }, 400);
+    if (
+      body.plate_diameter_cm !== undefined &&
+      (typeof body.plate_diameter_cm !== "number" || body.plate_diameter_cm <= 0)
+    ) {
+      return json({ error: "plate_diameter_cm must be a positive number when provided" }, 400);
     }
     if (body.food_volume_cm3 !== undefined && (typeof body.food_volume_cm3 !== "number" || body.food_volume_cm3 < 0)) {
       return json({ error: "food_volume_cm3 must be a non-negative number when provided" }, 400);
