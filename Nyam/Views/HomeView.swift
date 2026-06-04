@@ -123,9 +123,12 @@ struct HomeView: View {
         .padding(.top, 14)
     }
 
-    /// "June 2026" — wide month + year of the current week's anchor day.
+    /// "June 2026" — wide month + year of today, not the week's anchor day.
+    /// Using `weekStart` would say "May 2026" all week if the Sunday lands
+    /// in the previous month — confusing on Thursday Jun 4 with the week
+    /// starting on May 31.
     private var weekHeaderText: String {
-        weekStart.formatted(.dateTime.month(.wide).year())
+        Date().formatted(.dateTime.month(.wide).year())
     }
 
     private var recentlyUploaded: some View {
