@@ -20,8 +20,12 @@ struct ScanResult: Codable, Equatable {
 }
 
 enum NutritionSource: String, Codable, Equatable {
+    /// Looked up in USDA FoodData Central, scaled by the model's grams estimate.
     case usda
+    /// Vision model's own knowledge (USDA had no good match).
     case model
+    /// User entered the macros by hand via ManualEntryView.
+    case manual
 }
 
 struct ScanItem: Codable, Equatable, Identifiable {

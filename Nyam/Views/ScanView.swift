@@ -3,6 +3,31 @@ import ARKit
 import RealityKit
 import PhotosUI
 
+/// Active capture mode in `ScanView`. Wave 1 fully implements `.food`; the
+/// other two show "coming in v5.1" stub sheets when the user tries to act on
+/// them, but the picker UI is present so the demo shows all three modes.
+enum CaptureMode: String, CaseIterable, Identifiable {
+    case food, qr, menu
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .food: return "Food"
+        case .qr:   return "Barcode"
+        case .menu: return "Menu"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .food: return "fork.knife"
+        case .qr:   return "barcode.viewfinder"
+        case .menu: return "doc.text.viewfinder"
+        }
+    }
+}
+
 /// ARKit-backed scan view. Hosts a `RealityKit` `ARView` showing the live
 /// camera, watches for horizontal-plane detection, and on capture hands back
 /// the image + (optionally) the measured plate diameter in cm.
@@ -14,6 +39,8 @@ struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var arScan = ARScanSession()
     @State private var libraryPickerItem: PhotosPickerItem?
+    @State private var mode: CaptureMode = .food
+    @State private var showComingSoonSheet = false
     let onCapture: (ARMeasurement) -> Void
 
     var body: some View {
@@ -53,6 +80,9 @@ struct ScanView: View {
                         .padding(.top, 12)
                 }
 
+                modePicker
+                    .padding(.top, 6)
+
                 Spacer()
 
                 statusBanner
@@ -71,8 +101,12 @@ struct ScanView: View {
                     .accessibilityLabel("Choose from Library")
 
                     Button {
-                        let result = arScan.captureScan()
-                        onCapture(result)
+                        if mode == .food {
+                            let result = arScan.captureScan()
+                            onCapture(result)
+                        } else {
+                            showComingSoonSheet = true
+                        }
                     } label: {
                         ZStack {
                             Circle()
@@ -97,6 +131,44 @@ struct ScanView: View {
             guard let newItem else { return }
             Task { await loadLibraryPhoto(newItem) }
         }
+        .sheet(isPresented: $showComingSoonSheet) {
+            ComingSoonSheet(mode: mode)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    /// Three-up segmented picker for Food / Barcode / Menu modes.
+    /// Food fully wired; Barcode + Menu present the "coming soon" sheet
+    /// on capture for V5 Wave 1.
+    private var modePicker: some View {
+        HStack(spacing: 6) {
+            ForEach(CaptureMode.allCases) { m in
+                Button {
+                    mode = m
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: m.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(m.title)
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(mode == m ? Color.NyamSage.shade5 : Color.black.opacity(0.45))
+                    )
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+        )
     }
 
     @MainActor
@@ -156,6 +228,68 @@ struct ScanView: View {
         .padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .padding(.bottom, 18)
+    }
+}
+
+// MARK: - "Coming soon" sheet for Wave 2 modes
+
+private struct ComingSoonSheet: View {
+    let mode: CaptureMode
+    @Environment(\.dismiss) private var dismiss
+
+    private var copy: (title: String, body: String) {
+        switch mode {
+        case .qr:
+            return (
+                "Barcode scanning is coming soon",
+                "Point at a UPC barcode on packaged food. We'll pull verified nutrition from Open Food Facts, then ask you how many servings you ate."
+            )
+        case .menu:
+            return (
+                "Menu scanning is coming soon",
+                "Snap a restaurant menu. We'll identify each dish and estimate calories + macros per serving so you can decide before you order."
+            )
+        case .food:
+            return ("", "")  // not used
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                Circle()
+                    .fill(Color.NyamSage.shade5.opacity(0.12))
+                    .frame(width: 84, height: 84)
+                Image(systemName: mode.icon)
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(Color.NyamSage.shade5)
+            }
+            VStack(spacing: 8) {
+                Text(copy.title)
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                Text(copy.body)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            Spacer()
+            Button {
+                dismiss()
+            } label: {
+                Text("Got it")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.NyamSage.shade5, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+        .padding(.top, 40)
+        .background(Color.NyamSurface.background.ignoresSafeArea())
     }
 }
 
