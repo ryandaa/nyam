@@ -1,8 +1,8 @@
-# Nyam: Plate-Referenced Calorie Tracking
+# Nyam: Macro Tracking through Pictures
 
-> Take an overhead photo of your plate. Nyam uses the plate as a known-size reference to actually *measure* food portions, instead of free-form guessing like Cal-AI.
+> Take an overhead photo of your plate. Nyam uses the plate as a known-size reference to actually *measure* food portions.
 
-CS 153 Final Project. *The One-Person Frontier Lab*
+CS 153 Final Project.
 
 ---
 
