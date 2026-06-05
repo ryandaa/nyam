@@ -165,44 +165,6 @@ Populate this from your runs:
 - We're measuring grams, not full nutrition accuracy. Macro values depend on the model's food-knowledge lookup (USDA-style values), which we can't directly verify.
 - Layered foods (stir-fry, casseroles) will be wrong for both Nyam and the baseline. The plate anchor only helps when items are visually distinguishable.
 
-## Demo video script (target 3 to 4 min)
-
-Aligns to the rubric's four prompts: *why*, *how*, *use cases*, *what's next*.
-
-**0:00, 0:30 · Why this exists**
-- Show a Cal-AI screenshot and a kitchen scale next to a real meal.
-- "Cal-AI says this rice is 80 g. The scale says 220 g. The model has no scale reference, so it guesses."
-- One sentence on the insight: *your plate is a known-size object. Make the model use it.*
-
-**0:30, 1:00 · How it works**
-- Architecture diagram (1 slide): iPhone, then Vision-framework plate detection, then Cloudflare Worker, then GPT-4o structured output, then results.
-- Stress the two things that are new vs Cal-AI: on-device plate detection, and the prompt that anchors gram estimates to the plate's known area.
-
-**1:00, 2:30 · Live demo on iPhone**
-- Open the app, tap Continue (the stub auth, 2 sec).
-- Camera viewfinder, plate guide overlay.
-- Capture the same meal you weighed.
-- Calibration sheet: plate diameter prefilled, confirm.
-- Results page: per-item grams, macros, totals.
-- Tap "Scan again" to show how fast it is.
-
-**2:30, 3:15 · Accuracy eval**
-- One slide with the result table.
-- "Across 15 measured items, Nyam's mean error was X%; the unanchored baseline was Y%."
-- Be honest about where it failed (layered dishes, etc.).
-
-**3:15, 4:00 · What's next**
-- LiDAR side-view height (iPhone Pro). The second view the project proposal mentions.
-- Food log + daily targets (the standard tracker UX, kept out of V1).
-- Restaurant-mode (no plate visible). Needs a different anchor.
-- Closing line on impact: cheaper accuracy means trackers that more people can actually rely on.
-
-### Recording tips
-
-- Capture screen with QuickTime, File, New Movie Recording, choose iPhone as source.
-- Two phones works too: one to record, one running the app.
-- Bad audio sinks the rubric's *Communication* points faster than anything else. Use AirPods or a wired headset, not your laptop mic, and record voiceover separately if needed.
-
 ## AI usage disclosure
 
 Per the rubric's *Process, Integrity & Disclosure* section:
