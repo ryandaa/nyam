@@ -8,19 +8,15 @@ CS 153 Final Project. *The One-Person Frontier Lab*
 
 ## The problem
 
-The current category leader is [Cal AI](https://www.calai.app/), a calorie-tracking app built by two teenagers that crossed millions of downloads in 2024-2025 and was [acquired by MyFitnessPal in March 2026](https://techcrunch.com/2026/03/02/myfitnesspal-has-acquired-cal-ai-the-viral-calorie-app-built-by-teens/). Their stack, [per a March 2025 TechCrunch interview](https://techcrunch.com/2025/03/16/photo-calorie-app-cal-ai-downloaded-over-a-million-times-was-built-by-two-teenagers/) with founder Zach Yadegari, is **frontier vision LLMs from OpenAI and Anthropic plus retrieval over "open source food calorie and image databases from sites like GitHub."** No specific model is named, and no nutrition database is cited.
+The current category leader is [Cal AI](https://www.calai.app/), a calorie-tracking app built by two teenagers that crossed millions of downloads in 2024-2025 and was [acquired by MyFitnessPal in March 2026](https://techcrunch.com/2026/03/02/myfitnesspal-has-acquired-cal-ai-the-viral-calorie-app-built-by-teens/). Their stack, [per a March 2025 TechCrunch interview](https://techcrunch.com/2025/03/16/photo-calorie-app-cal-ai-downloaded-over-a-million-times-was-built-by-two-teenagers/) with founder Zach Yadegari, is **frontier vision LLMs from OpenAI and Anthropic plus retrieval over "open source food calorie and image databases from sites like GitHub."** No specific model is named, and no nutrition database is cited. 
 
-Crucially, **Cal AI has no scale anchor in the photo.** No reference object, no depth sensing, no LiDAR. The founder [told CNBC](https://www.cnbc.com/2025/09/06/cal-ai-how-a-teenage-ceo-built-a-fast-growing-calorie-tracking-app.html) in September 2025:
+Crucially, **Cal AI has no scale anchor in the photo (or any way to measure the size of food in the pictures themselves.** No reference object, no depth sensing, no LiDAR, which was [mentioned] (https://www.cnbc.com/2025/09/06/cal-ai-how-a-teenage-ceo-built-a-fast-growing-calorie-tracking-app.html) by the founder in September 2025:
 
 > "Some of our users expect it to have X-ray vision, where if you take a picture of a bowl of food and you hid things at the bottom of the bowl, it's going to pick it up. It won't."
 
 In other words: a single 2D photo through a vision LLM, with no spatial measurement layer. Their public accuracy figure is a founder-attributed ~90%, which TechCrunch explicitly noted it "couldn't validate." Independent reviewers have reported significant undercounting on mixed and high-fat meals.
 
-## The insight
-
-**Your plate is a known-size object that appears in almost every food photo.** A standard US dinner plate is 10 to 11 inches across, and the iPhone's own sensors can recover that size in real-world centimeters without any user input. Once we have the plate's real diameter, every food item on it can be measured against the same anchor, and the vision model is reduced from "guess scale + recognize food" to just "recognize food + apply density."
-
-That's Nyam.
+I wanted to build Nyam to be a free, open source repo for users who don't want to pay for CalAI, while have competitive performance to the real thing, alongside a few other perks like an on-demand dietician
 
 ## How Nyam differs from Cal AI
 
