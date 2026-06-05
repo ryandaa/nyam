@@ -48,10 +48,6 @@ iPhone (SwiftUI)
     Results: per-item grams + macros + plate area %
 ```
 
-- **Native iOS app** (SwiftUI, iOS 17+): one-tap stub auth, live ARKit-anchored camera scan, results, with the V2 manual-calibration flow as a fallback when the AR plane can't be detected. *(The Worker is built for Sign in with Apple. V1 ships a stub because free Apple Developer accounts can't sign apps with the SIWA capability. Swapping back to real SIWA is a few-line change in `AuthView` and `AuthManager`.)*
-- **Cloudflare Worker** (TypeScript): thin proxy that keeps the OpenAI key off the device. Validates Apple identity tokens on real requests; honors `?dev=1` to skip validation for the V1 stub flow.
-- **OpenAI GPT-4o** with `response_format: json_schema` for structured nutrition output, no string parsing.
-
 ## Setup
 
 ### Prerequisites
@@ -59,7 +55,7 @@ iPhone (SwiftUI)
 - macOS with **Xcode 15+** (iOS 17 SDK)
 - **Node 20+** and **npm**
 - **Cloudflare account** (free tier is plenty) and `wrangler` CLI (`npm i -g wrangler`)
-- **OpenAI API key** with `gpt-4o` access
+- **OpenAI API key** with `gpt-4o` access (or any other LLM key)
 - **USDA FoodData Central API key** (free, instant). Sign up at [api.data.gov/signup](https://api.data.gov/signup/). Optional. Nyam works without it; you just lose per-item USDA grounding
 - **Apple Developer account** (free tier works for personal-device testing). Paid tier only required if you swap the V1 stub auth back to real Sign in with Apple
 - An **iPhone** for testing (Pro recommended; LiDAR is a planned future feature)
@@ -117,65 +113,18 @@ In Xcode:
 9. **Results view.** Model-generated title at top, per-item cards with USDA / AI-estimate badges, totals card highlighting Calories, Protein, Fiber, Sodium.
 10. **History.** Entry persisted to UserDefaults with the captured JPEG saved to `Documents/scans/`. Home feed shows a Strava-style card with the hero image and four stat chips.
 
-## Evaluation
-
-### Why a real eval matters
-
-The whole pitch of Nyam vs Cal-AI is *accuracy*. So the eval has to actually measure that, not "the demo looked nice." We compare Nyam's per-item gram estimates against ground-truth kitchen-scale measurements, alongside an unanchored GPT-4o baseline (no plate reference, same prompt structure otherwise). The point isn't to claim production accuracy; it's to show the plate-anchor reduces systematic error.
-
-### Methodology
-
-For each test meal:
-
-1. **Weigh each component on a kitchen scale** (g, to nearest 1 g). Record the ground truth.
-2. **Plate the meal on a known plate.** Measure the actual plate diameter with a tape measure (most US dinner plates are 26 cm / 10.2 in, but verify yours).
-3. **Photograph overhead** at ~50 cm height, plate centered, plate fully in frame, even lighting. Use the same iPhone for every meal in the eval to remove camera variance.
-4. **Run through Nyam** via `python start.py meal_<n>.jpg <diameter_cm>`. Record per-item estimates.
-5. **Run the unanchored baseline.** Same photo, prompt OpenAI directly (no plate diameter, no scale anchor):
-   ```python
-   # baseline: same image, same JSON schema, but the system prompt
-   # never mentions the plate or scale anchor.
-   ```
-6. **Compute Δ%** as `(nyam_g - true_g) / true_g * 100` per item, then again for the baseline. Mean absolute Δ% across all items is the headline number.
-
-### Sample size
-
-Aim for **≥ 5 meals × ~3 components each = 15 measured items**. More is better, but 15 is enough to show whether the plate anchor helps. Mix easy meals (well-separated items, e.g. chicken, rice, broccoli) and hard meals (layered, e.g. stir-fry on rice, salad with dressing).
-
-### Result template
-
-Populate this from your runs:
-
-| Meal | Component | True g | Nyam g | Nyam Δ% | Baseline g | Baseline Δ% |
-|---|---|---|---|---|---|---|
-| 1, chicken plate | grilled chicken | | | | | |
-| 1, chicken plate | jasmine rice | | | | | |
-| 1, chicken plate | broccoli | | | | | |
-| … | … | | | | | |
-| **Mean abs Δ%** | | | | **TBD** | | **TBD** |
-
 ### Honest limitations
-
-- One photographer, one phone, one plate type. Results don't generalize.
 - We're measuring grams, not full nutrition accuracy. Macro values depend on the model's food-knowledge lookup (USDA-style values), which we can't directly verify.
-- Layered foods (stir-fry, casseroles) will be wrong for both Nyam and the baseline. The plate anchor only helps when items are visually distinguishable.
+- Layered foods (stir-fry, casseroles) will be wrong for both Nyam and the baseline. The plate anchor only helps when items are visually distinguishable. We try and counteract this with the LIDAR system
 
 ## AI usage disclosure
 
-Per the rubric's *Process, Integrity & Disclosure* section:
+I used Claude Code with Opus 4.7 to help scaffold the project structure and to also help build the frontend UI. Architecture, app features, and frontend UI decisions were thought of by me. The prompts were also built by me. Although, most of the code was built by the LLM. No code aws forked in the process.
 
-- **Claude (Claude Code with Opus 4.7).** Used to scaffold the project structure, write the initial SwiftUI views, the Cloudflare Worker, and this README. Architecture decisions were made via Q&A with the user before any code was written; the plan is committed in the repo history.
-- **OpenAI GPT-4o.** Used at runtime as the vision model that identifies food and estimates portion sizes. This is the core ML component of the product.
-- **No code was forked from another project.** All Swift and TypeScript was written for this repo.
+I also used GPT-4o for LLM calls
 
 ## Limitations and future work
-
-- **Single overhead photo only.** Partially hidden foods (layered dishes, bowls of soup with toppings) are still hard.
-- **No food-log persistence.** V1 shows results once; planned next is a Cloudflare D1 store keyed by SIWA `sub`.
-- **No daily targets or weight goals.** Planned.
-- **LiDAR depth-based volume** only works on iPhone Pro models; planned as a side-view companion capture to estimate food height (the second view the project proposal mentions).
-- **Confidence scores per item.** Model can output them; we drop them from the UI in V1 to keep it simple.
-- **Plate detection robustness.** Vision rectangle detection works well on round plates against contrasting tablecloths; rectangular plates and busy backgrounds degrade it.
+There are a few things I want to keep working on. The biggest one is expanding the core food database so every food lookup hits a USDA-approved value instead of falling back on the model's estimates. Partially hidden foods are also still tough, since right now the app only sees one overhead photo, so layered dishes and bowls of soup with toppings throw it off. Weight goals are planned but not in the build yet. The LiDAR depth-based volume only works on iPhone Pro models, so the next step is a side-view companion capture to estimate food height, which was actually the second view I mentioned in my original project proposal. And on plate detection, Vision's rectangle detection works well on round plates against contrasting tablecloths, but rectangular plates and busy backgrounds still degrade the accuracy.
 
 ## Repo layout
 
@@ -204,7 +153,3 @@ nyam/
     └── test/
         └── sample-call.sh
 ```
-
-## License
-
-MIT (see `LICENSE`, TBD).
