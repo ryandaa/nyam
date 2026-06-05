@@ -1,8 +1,7 @@
 # Nyam: Macro Tracking through Pictures
-
+## CS 153 Final Project
 > Take an overhead photo of your plate. Nyam uses the plate as a known-size reference to actually *measure* food portions.
 
-CS 153 Final Project.
 
 ---
 
