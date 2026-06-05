@@ -99,19 +99,7 @@ In Xcode:
 
 ## How it works end-to-end
 
-1. **Auth.** V1 ships a one-tap "Continue" stub that stores a placeholder token in Keychain. The Worker accepts it via `?dev=1`. (Architecture is ready for real Sign in with Apple. See the comment in `AuthManager.swift`.)
-2. **AR camera view.** `ARWorldTrackingConfiguration` runs visual-inertial odometry to find the table as a horizontal plane. As soon as the plane is locked, the capture button turns sage.
-3. **Capture + measurement.** On shutter tap, the captured `ARFrame` is processed:
-   - Apple Vision framework (`VNDetectContoursRequest`) finds the plate's ellipse in pixel space.
-   - `ARFrame.raycastQuery` shoots a ray from the plate's screen-space center onto the detected horizontal plane to get the real distance from camera to plate in meters.
-   - Pinhole projection (`real_diameter = pixel_diameter × distance / focal_length_px`) using the focal length from `ARFrame.camera.intrinsics` gives the plate's real-world diameter in cm.
-4. **POST `/scan`.** Image and measured plate diameter are sent to the Worker. If AR couldn't lock on (no plane, bad lighting), the V2 manual-calibration sheet asks the user to enter the plate size instead.
-5. **(LiDAR-only)** On Pro iPhones, `ARFrame.sceneDepth` is also captured. Every depth-map pixel within the plate's world disk gets backprojected to a 3D position; pixels above the plate plane are summed as `height × pixel_area` for the total food volume in cm³. That measured volume is shipped to the Worker alongside the image and the plate diameter.
-6. **POST `/scan`.** Image plus measured plate diameter (plus measured food volume on LiDAR) sent to the Worker. If AR couldn't lock on, the V2 manual-calibration sheet asks for the plate size instead.
-7. **Worker.** Verifies the Apple JWT (or skips it via `?dev=1`), then calls OpenAI GPT-4o with `response_format: { type: "json_schema", json_schema: SCAN_SCHEMA }`. The schema forces per-item dimensions, macros, and a short title. When LiDAR volume was supplied, the user-message also tells the model the measured total cm³ to constrain its estimates.
-8. **USDA enrichment.** For each item the model identified, the Worker queries [FoodData Central](https://fdc.nal.usda.gov/) and replaces the model's macros with USDA's per-100g values scaled by the grams estimate. Items without a USDA match keep the model's numbers. Per-item provenance (`nutrition_source: "usda" | "model"`) is returned to iOS.
-9. **Results view.** Model-generated title at top, per-item cards with USDA / AI-estimate badges, totals card highlighting Calories, Protein, Fiber, Sodium.
-10. **History.** Entry persisted to UserDefaults with the captured JPEG saved to `Documents/scans/`. Home feed shows a Strava-style card with the hero image and four stat chips.
+At a high level, the flow goes from the iPhone camera to a results view in about fifteen seconds. When you open the camera, the app is actually running ARKit instead of a regular camera, so it can detect the table as a flat surface and figure out the plate's real-world diameter from camera physics alone, no user input needed. On iPhone Pro it also reads the LiDAR depth map to get the actual cubic centimeters of food on the plate. Once you capture, the image and those measurements get sent to a Cloudflare Worker, which calls GPT-4o with a strict JSON schema that forces the model to commit to per-item dimensions before estimating macros. The Worker then takes every food name the model identified and looks it up in USDA's FoodData Central database, replacing the model's macro guesses with US government data. What you see on the results screen is either USDA-grounded or marked with an AI-estimate badge so the provenance is honest, and the whole entry gets saved locally so it shows up in the Home feed.
 
 ### Honest limitations
 - We're measuring grams, not full nutrition accuracy. Macro values depend on the model's food-knowledge lookup (USDA-style values), which we can't directly verify.
@@ -123,7 +111,7 @@ I used Claude Code with Opus 4.7 to help scaffold the project structure and to a
 
 I also used GPT-4o for LLM calls
 
-## Limitations and future work
+## Future work
 There are a few things I want to keep working on. The biggest one is expanding the core food database so every food lookup hits a USDA-approved value instead of falling back on the model's estimates. Partially hidden foods are also still tough, since right now the app only sees one overhead photo, so layered dishes and bowls of soup with toppings throw it off. Weight goals are planned but not in the build yet. The LiDAR depth-based volume only works on iPhone Pro models, so the next step is a side-view companion capture to estimate food height, which was actually the second view I mentioned in my original project proposal. And on plate detection, Vision's rectangle detection works well on round plates against contrasting tablecloths, but rectangular plates and busy backgrounds still degrade the accuracy.
 
 ## Repo layout
